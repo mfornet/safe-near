@@ -1,3 +1,4 @@
+import Bridge.Methods.RejectedRunPlan
 import Bridge.Methods.FtBalanceOfUninitialized
 import Bridge.Methods.FtBalanceOfInitialized
 import Bridge.Methods.FtBalanceOfFullWeightedObject
@@ -228,7 +229,19 @@ theorem ftBalanceOf_absent_parser_plan_obligation (cfg : Config)
     hwf hm hparse hlimit
     (ftBalanceOf_absent_parser_cost_obligation cfg protocol hprotocol he hcfg raw ctx S a hrep hwf hctx hm hparse ha hother hobject)
 
-/-- Precise remaining safety for uninitialized state with rejected balance input. -/
+/-- Precise remaining actual function-297 rejected run, finite cost before gas and reachable relaxed precondition. -/
+theorem ftBalanceOf_uninitialized_rejected_run_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw none) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (hreject : ¬ ∃ a, (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) :
+    Binary.PanicTotal.RejectedRunPlan raw ctx := by
+  sorry
+
+/-- Original rejected-input safety follows through checked receipt observation from the named complete-run frontier. -/
 theorem ftBalanceOf_uninitialized_rejected_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -239,7 +252,9 @@ theorem ftBalanceOf_uninitialized_rejected_no_issue_obligation (cfg : Config) (c
     (hreject : ¬ ∃ a, (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) :
     ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
       .error (.executionIssue msg) := by
-  sorry
+  exact (Binary.PanicTotal.rejected_receipt_of_plan wNearBytes.size codeOf raw ctx
+    (by rw [hctx]; exact he.runtime) hwf hm
+    (ftBalanceOf_uninitialized_rejected_run_obligation cfg codeOf protocol hprotocol he hcfg raw ctx hrep hwf hctx hm hreject)).2
 
 set_option maxRecDepth 20000 in
 /-- Checked uninitialized accepted receipt, conditional on the pinned argument ceiling. -/
@@ -285,7 +300,20 @@ theorem ftBalanceOf_uninitialized_no_issue_obligation (cfg : Config) (codeOf : L
   · exact ftBalanceOf_uninitialized_rejected_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw ctx
       hrep hwf hctx hm hp
 
-/-- Precise remaining execution safety for initialized state with rejected input. -/
+/-- Precise remaining actual function-297 rejected run, finite cost before gas and reachable relaxed precondition. -/
+theorem ftBalanceOf_initialized_rejected_run_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (S : State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+
+    (hreject : ¬ ∃ a, (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) :
+    Binary.PanicTotal.RejectedRunPlan raw ctx := by
+  sorry
+
+/-- Original rejected-input safety follows through checked receipt observation from the named complete-run frontier. -/
 theorem ftBalanceOf_initialized_rejected_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -297,7 +325,9 @@ theorem ftBalanceOf_initialized_rejected_no_issue_obligation (cfg : Config) (cod
     (hreject : ¬ ∃ a, (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) :
     ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
       .error (.executionIssue msg) := by
-  sorry
+  exact (Binary.PanicTotal.rejected_receipt_of_plan wNearBytes.size codeOf raw ctx
+    (by rw [hctx]; exact he.runtime) hwf hm
+    (ftBalanceOf_initialized_rejected_run_obligation cfg codeOf protocol hprotocol he hcfg raw S ctx hrep hwf hctx hm hreject)).2
 
 set_option maxRecDepth 20000 in
 /-- Checked original safety complement: accepted receipts in both states and precise rejected-input leaves. -/

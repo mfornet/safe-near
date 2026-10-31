@@ -1,3 +1,7 @@
+import Bridge.Methods.RejectedRunPlan
+import Bridge.Methods.BalanceOfRejectedObservation
+import Bridge.Functions.BalanceOf297RejectPanicTotal
+import Bridge.Methods.RecordedFailure
 import Bridge.Functions.SerdeSyntaxBody
 import Bridge.Functions.SerdeActualSink
 import Bridge.Functions.SerdeErrorPayload
@@ -4210,8 +4214,8 @@ attribute [blueprint "frontier:balance-uninitialized-safety"
   WNear.ftBalanceOf_uninitialized_no_issue_obligation
 
 attribute [blueprint "frontier:balance-initialized-rejected-safety"
-  (title := /-- Rejected initialized balance input: execution-safety frontier -/)
-  (statement := /-- Exact remaining execution-safety obligation for initialized state with no accepted balance-query parse. Original runtime, represented storage, well-formed context and method premises are retained. Accepted initialized calls are excluded precisely. -/)
+  (title := /-- Checked initialized rejected balance safety from the exact method run -/)
+  (statement := /-- Original full-context binary/runtime/represented-state/context/method/rejected-input statement is unchanged. Its proof now composes exact function-297 receipt rollback/no-issue from the named complete rejected method run. Conditional through that precise Open run obligation; actual parser ownership, formatting, uniform cost and execution remain unfinished. -/)
   (notReady := true)]
   WNear.ftBalanceOf_initialized_rejected_no_issue_obligation
 
@@ -4384,8 +4388,8 @@ attribute [blueprint "frontier:none-accepted-under-limit"
   WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines_under_limit
 
 attribute [blueprint "frontier:balance-uninitialized-rejected-safety"
-  (title := /-- Rejected uninitialized balance input: execution-safety frontier -/)
-  (statement := /-- Exact remaining no-execution-issue obligation for represented uninitialized state with no accepted balance parse. Original binary/runtime/context premises are retained; completed accepted receipts are excluded precisely. -/)
+  (title := /-- Checked uninitialized rejected balance safety from the exact method run -/)
+  (statement := /-- Original full-context binary/runtime/represented-state/context/method/rejected-input statement is unchanged. Its proof now composes exact function-297 receipt rollback/no-issue from the named complete rejected method run. Conditional through that precise Open run obligation; actual parser ownership, formatting, uniform cost and execution remain unfinished. -/)
   (notReady := true)]
   WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation
 
@@ -4764,3 +4768,247 @@ attribute [blueprint "frontier:serde-static-debug-dispatch"
   (statement := /-- Actual function 882 reaches the whole checked Debug body with its static first writer constructed from the real engine and String sink. Vtable/table ownership, complete frame, returned heap and gas are retained. No assumed generic first-writer or generic Debug interface remains as an input; outer formatting and scratch-room remain explicit. -/)
   (notReady := true)]
   WNear.Binary.SerdeSyntax.f882_static_composed
+
+attribute [blueprint "frontier:panic-large-read"
+  (title := /-- Oversized explicit panic fails before reading message memory -/)
+  (statement := /-- Actual panicUtf8Read reports totalLogLengthExceeded before any memory/UTF8 read. Explicit-length, configured remaining log capacity and oversize premises are precise local environmental cases; no universal log-fit premise is imposed. -/)]
+  NearLogic.PanicUtf8Large.panicUtf8Read_large
+
+attribute [blueprint "frontier:panic-large-charges"
+  (title := /-- Oversized panic charges exactly two base operations -/)
+  (statement := /-- Actual metering selects only base and utf8_decoding_base; memory-byte and decode-byte charges are absent on this protocol failure branch. -/)]
+  NearLogic.PanicUtf8Large.chargesBefore_large
+
+attribute [blueprint "frontier:panic-large-invoke"
+  (title := /-- Actual metered oversized panic preserves memory and host effects -/)
+  (statement := /-- Exact host invocation traps with the real size-limit message and error, unchanged memory, erased host state except lastError, exact two-charge gas use and retained gas ceilings. -/)]
+  NearLogic.PanicUtf8Large.panicUtf8_large
+
+attribute [blueprint "frontier:panic-large-host-contract"
+  (title := /-- Oversized panic has a checked exact TrapContractP -/)
+  (statement := /-- Host trap interface is proved with an empty memory ownership range because the oversized branch never reads the pointer. Exact error, gas, memory and erased-state clauses are retained. -/)]
+  NearLogic.PanicUtf8Large.panicUtf8_large_contract
+
+attribute [blueprint "frontier:panic-large-no-issue"
+  (title := /-- Size-limit panic error is a concrete protocol failure -/)
+  (statement := /-- Kernel reduction proves this precise error has no execution issue. It does not excuse an unsupported host operation or an internal VM failure. -/)]
+  NearLogic.PanicUtf8Large.largeError_no_issue
+
+attribute [blueprint "frontier:panic-large-not-out-of-gas"
+  (title := /-- Size-limit error differs from gas exhaustion -/)
+  (statement := /-- The oversized-message protocol failure is classified exactly; no change to the contract resource-failure semantics. -/)]
+  NearLogic.PanicUtf8Large.largeError_not_out_of_gas
+
+attribute [blueprint "frontier:panic-message-size-cases"
+  (title := /-- Nonempty messages either fit or exceed remaining log capacity -/)
+  (statement := /-- Checked exhaustive case split on actual optional maxLogLen and existing logs. This avoids restricting deployed rejected inputs to messages that fit. -/)]
+  NearLogic.PanicUtf8Large.log_length_cases
+
+attribute [blueprint "frontier:panic-large-trampoline"
+  (title := /-- Actual panic trampoline consumes oversized host contract -/)
+  (statement := /-- Function 262 invokes actual panic_utf8 and preserves the exact protocol error and single credit resource, with no message-memory-read assumption. -/)]
+  WNear.Binary.PanicTotal.f262_large
+
+attribute [blueprint "frontier:panic-large-interface"
+  (title := /-- Installed blockchain interface dispatches oversized panic -/)
+  (statement := /-- Actual RefCell/installed-interface function 448 reaches the checked trampoline. Exact installed table, stack and one global/credit resources are used. -/)]
+  WNear.Binary.PanicTotal.f448_large
+
+attribute [blueprint "frontier:panic-large-env"
+  (title := /-- Actual env panic_str handles oversized explicit messages -/)
+  (statement := /-- Function 521 composes the installed interface and actual host branch. Its cost is the original regular operations plus the two base host charges. -/)]
+  WNear.Binary.PanicTotal.f521_large
+
+attribute [blueprint "frontier:panic-large-hook"
+  (title := /-- Actual SDK hook reaches oversized protocol failure -/)
+  (statement := /-- The real hook formats owned bytes via named ToStr, then invokes actual env panic_str. No UTF8 or memory-read proof is required for the host oversized branch, and no nonempty ownership is invented. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f474_large
+
+attribute [blueprint "frontier:panic-trap-cost-mono"
+  (title := /-- Trap cost weakening preserves the single credit resource -/)
+  (statement := /-- Checked generic cost monotonicity for exact trap specifications; no second gas cell or duplicated credit is introduced. -/)]
+  WNear.Binary.PanicTotal.trap_cost_mono
+
+attribute [blueprint "frontier:panic-large-cost-bound"
+  (title := /-- Oversized host cost fits the original panic upper bound -/)
+  (statement := /-- The two actual base charges are bounded by the unchanged panicUtf8Use budget for every length. -/)]
+  WNear.Binary.PanicTotal.largeUse_le
+
+attribute [blueprint "frontier:panic-total-hook"
+  (title := /-- SDK panic hook composes both message-size branches -/)
+  (statement := /-- Exact expectedError chooses guestPanic for fitting messages and totalLogLengthExceeded for oversized messages. Original cost474 bound, byte-length/UTF8 and read-cost bounds are preserved; LogFits is no longer required. Named ToStr remains unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f474_total
+
+attribute [blueprint "frontier:panic-total-no-issue"
+  (title := /-- Both selected panic errors have no execution issue -/)
+  (statement := /-- Kernel-checked exact error classification covers both actual host branches. No assumption that arbitrary failures are acceptable. -/)]
+  WNear.Binary.PanicTotal.expectedError_no_issue
+
+attribute [blueprint "frontier:panic-total-not-out-of-gas"
+  (title := /-- Both selected panic errors retain exact gas classification -/)
+  (statement := /-- Both selected host errors are concretely not out of gas; original receipt resource alternatives are unchanged. -/)]
+  WNear.Binary.PanicTotal.expectedError_not_out_of_gas
+
+attribute [blueprint "frontier:panic-total-callback"
+  (title := /-- Installed hook callback composes the total panic hook -/)
+  (statement := /-- Actual function 473 invokes the checked two-branch hook, retaining the original callback cost and stack/host ownership. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f473_total
+
+attribute [blueprint "frontier:panic-total-with-hook"
+  (title := /-- rust panic_with_hook consumes exact payload and to-string contracts -/)
+  (statement := /-- Actual function 824 composes both message-size branches through the callback. GetSpec and ToStr remain named verification inputs; old cost824, owned payload/frame and one global/credit resource are preserved. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f824_total
+
+attribute [blueprint "frontier:panic-total-common-spec"
+  (title := /-- Exact common panic contract covers both protocol outcomes -/)
+  (statement := /-- Named common-entry interface remains Open as a generic family. Specific checked constructors can supply it, but arbitrary payload Get, formatting and method-run instances remain unfinished. Old Spec817 is unchanged. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.Spec817Total
+
+attribute [blueprint "frontier:panic-total-common-instance"
+  (title := /-- Formatted common panic entry constructs its total interface -/)
+  (statement := /-- Actual function 817 constructs the new common contract from exact payload GetSpec and ToStr for the formatted-Arguments branch, with original cost817 and actual payload/environment. No LogFits premise. Generic interface stays Open. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f817_fmt_total
+
+attribute [blueprint "frontier:panic-total-common-frame"
+  (title := /-- Common panic contract preserves additional owned caller resources -/)
+  (statement := /-- Checked frame conversion for the exact two-branch common-entry interface. Does not discharge its concrete instance obligation. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.Spec817Total_mono
+
+attribute [blueprint "frontier:panic-total-816"
+  (title := /-- Actual panic formatter wrapper consumes total common entry -/)
+  (statement := /-- Function 816 preserves the actual frame and exact selected error, conditional on the named common-entry instance. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f816_total
+
+attribute [blueprint "frontier:panic-total-823"
+  (title := /-- Actual panic branch composes the formatter wrapper -/)
+  (statement := /-- Function 823 reaches the total formatter wrapper with exact message/info/location and caller resources. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f823_total
+
+attribute [blueprint "frontier:panic-total-859"
+  (title := /-- Actual panic_fmt constructs its Arguments branch -/)
+  (statement := /-- Function 859 reaches the total panic branch, preserving all argument fields and the one credit/global state. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f859_total
+
+attribute [blueprint "frontier:panic-total-expect-entry"
+  (title := /-- Actual unwrap-failure entry consumes exact total panic interface -/)
+  (statement := /-- Function 881 uses the precise common contract for either host error. Original 250-operation overhead, owned stack and expect-error descriptor are retained. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f881_total_spec
+
+attribute [blueprint "frontier:panic-total-expect-full"
+  (title := /-- Unwrap-failure entry constructs its whole common panic path -/)
+  (statement := /-- Constructs Spec817Total from GetSpec and ToStr before composing all actual wrappers. The common panic contract is no longer an input premise; exact owned payload, deep stack, environment and cost817 remain. Actual Get/ToStr instances remain Conditional. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.f881_total_full
+
+attribute [blueprint "frontier:balance-reject-total-block"
+  (title := /-- Rejected balance handoff invokes exact two-branch panic entry -/)
+  (statement := /-- Actual rejected result-tag branch of function 297 stores the error pointer and calls function 881. Preserves exact host error, old 300-operation overhead and one credit resource; conditional on named common panic contract. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.parser_handoff_reject_total
+
+attribute [blueprint "frontier:balance-reject-total-constructed"
+  (title := /-- Rejected balance handoff constructs the complete panic entry -/)
+  (statement := /-- Actual function-297 rejection branch constructs the panic entry from explicit GetSpec and ToStr, retaining error/tag/output ownership, full deep stack, env, actual location and old cost. No whole common-entry premise or universal LogFits assumption remains. Parser-owned error production, formatting, uniform cost and complete receipt run are not discharged. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.parser_handoff_reject_total_full
+
+attribute [blueprint "frontier:panic-total-erase"
+  (title := /-- Selected error is stable under gas erasure -/)
+  (statement := /-- Actual message-size decision and exact error are invariant when only gas counters are erased. -/)]
+  WNear.Binary.PanicTotal.expectedError_erase
+
+attribute [blueprint "frontier:panic-total-erase-proof"
+  (title := /-- Selected error is stable under gas and recorded-proof erasure -/)
+  (statement := /-- Gas/proof relaxation retains the actual configured log limit, logs and exact host-error choice used in receipt composition. -/)]
+  WNear.Binary.PanicTotal.expectedError_eraseP
+
+attribute [blueprint "frontier:panic-total-host-fields"
+  (title := /-- Exact trap post supplies final receipt host fields -/)
+  (statement := /-- Extracts exact lastError and preserved absence of execution issue from erased-host equality. Initial no-issue is an explicit premise; no host state is invented. -/)]
+  WNear.Binary.PanicTotal.failedHost_fields
+
+attribute [blueprint "frontier:recorded-failure-run"
+  (title := /-- Complete recorded-failure method run remains a verification obligation -/)
+  (statement := /-- Exact wrapper of existing MethodPanicsR: every initial host/fuel/gas ceiling meeting the precondition must produce the actual method trap, final host relation and gas bound. This generic contract remains Open until concrete method runs are supplied; no deployed input is excluded. -/)
+  (notReady := true)]
+  WNear.Binary.RecordedFailure.RecordedFailureRun
+
+attribute [blueprint "frontier:recorded-failure-outcome"
+  (title := /-- Actual recorded host trap preserves exact VM outcome -/)
+  (statement := /-- Checked trapError and checkReceipts observation retains exact host error, no return data or receipts, logs and burnt gas. Final lastError and absence of execution issue are explicit host premises. -/)]
+  WNear.Binary.RecordedFailure.outcome_failure
+
+attribute [blueprint "frontier:recorded-failure-funded-vm"
+  (title := /-- Funded method run reaches exact recorded failure -/)
+  (statement := /-- Composes loading, fuel and a named complete method run to exact VM failure with original gas ceiling. Conditional on RecordedFailureRun; no method execution is assumed completed. -/)
+  (notReady := true)]
+  WNear.Binary.RecordedFailure.method_vmOutcomeFailure
+
+attribute [blueprint "frontier:recorded-failure-any-gas-vm"
+  (title := /-- Any-gas comparison retains recorded failure or resource failure -/)
+  (statement := /-- Uses the existing checked gas/fuel/proof relaxation to compare actual method execution with the named complete run. Exact host failure or existing resource-failure alternative, with preserved logs. Conditional on RecordedFailureRun. -/)
+  (notReady := true)]
+  WNear.Binary.RecordedFailure.method_vm_anyFailure
+
+attribute [blueprint "frontier:recorded-failure-observe"
+  (title := /-- Boundary observes exact host failure with rollback and no issue -/)
+  (statement := /-- Checked observation retains the exact failureOf error and logs, rolls back storage/balance/usage/receipts, and excludes execution issues using the explicit concrete error classification. No arbitrary failure or weaker observation replaces the original boundary. -/)]
+  WNear.Binary.RecordedFailure.observe_failure
+
+attribute [blueprint "frontier:recorded-failure-receipt-safety"
+  (title := /-- Complete recorded-failure run composes to full receipt safety -/)
+  (statement := /-- Original full-context receipt execution rolls back and has no execution issue through exact failure or existing resource alternatives. Conditional on the named complete method run, precondition and exact final-host relation. It does not close rejected wNEAR receipts until the actual run and payload formatting are supplied. -/)
+  (notReady := true)]
+  WNear.Binary.RecordedFailure.method_boundary_no_issue
+
+attribute [blueprint "frontier:panic-local-receipt-projection"
+  (title := /-- Local exact panic post supplies receipt failure fields -/)
+  (statement := /-- Checked projection from the local exact erased-host relation to the receipt error fields. Initial no-issue remains explicit; actual method input/storage register effects remain available to the full run. -/)]
+  WNear.Binary.PanicTotal.rejectedPanicPost_receipt
+
+attribute [blueprint "frontier:panic-total-receipt-safety"
+  (title := /-- Actual selected panic errors compose to full receipt safety -/)
+  (statement := /-- Instantiates generic receipt composition with the actual expectedError and checked gas/proof erasure invariance. Exact final error fields allow real register effects. Complete RecordedFailureRun and reachable precondition remain explicit unresolved inputs; no actual method run is assumed proved. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.rejected_receipt_no_issue
+
+attribute [blueprint "frontier:balance-reject-receipt-composition"
+  (title := /-- Exported ft_balance_of rejected panic route reaches receipt rollback and safety -/)
+  (statement := /-- Uses the actual function-297 export and type to compose the original full-context ft_balance_of receipt. Conditional on its exact complete RecordedFailureRun and reachable precondition. Parser-owned payloads, Get/ToStr, uniform cost and actual full rejected method execution remain unfinished. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.balance_rejected_receipt_no_issue
+
+attribute [blueprint "frontier:balance-uninitialized-rejected-run"
+  (title := /-- Actual uninitialized rejected function-297 run remains Open -/)
+  (statement := /-- Precise remaining plan for the actual complete method run: finite cost chosen before any gas ceiling, actual function 297, reachable gas/proof-relaxed host precondition, exact selected panic error and final no-issue fields. All original represented storage, well-formed context, pinned protocol, method and rejected-input premises are retained. Parser-owned payload, Get/ToStr, full input/rejection coverage and uniform cost must be constructed; no deployed input is narrowed. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_uninitialized_rejected_run_obligation
+
+attribute [blueprint "frontier:balance-initialized-rejected-run"
+  (title := /-- Actual initialized rejected function-297 run remains Open -/)
+  (statement := /-- Precise remaining plan for the actual complete method run: finite cost chosen before any gas ceiling, actual function 297, reachable gas/proof-relaxed host precondition, exact selected panic error and final no-issue fields. All original represented storage, well-formed context, pinned protocol, method and rejected-input premises are retained. Parser-owned payload, Get/ToStr, full input/rejection coverage and uniform cost must be constructed; no deployed input is narrowed. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_initialized_rejected_run_obligation
+
+attribute [blueprint "frontier:rejected-method-run-plan"
+  (title := /-- Reachable complete rejected method-run plan remains unresolved -/)
+  (statement := /-- Precise existential Pre, finite cost and message bytes; complete actual function-297 RecordedFailureRun holds uniformly before the gas ceiling and Pre holds on the actual relaxed initial host. The full method endpoint records exact error fields while allowing actual input/storage register effects. Generic interface stays Open until concrete rejecting parser, formatting, cost and method execution instances are supplied. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.RejectedRunPlan
+
+attribute [blueprint "frontier:rejected-receipt-plan-composition"
+  (title := /-- Complete rejected method plan composes to original receipt safety -/)
+  (statement := /-- Checked exact full-context receipt execution, rollback and no execution issue from the named complete rejected method plan. Original method/runtime/domain remains unchanged; this result remains Conditional until the actual method plan is proved. -/)
+  (notReady := true)]
+  WNear.Binary.PanicTotal.rejected_receipt_of_plan

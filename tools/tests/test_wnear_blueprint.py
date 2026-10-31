@@ -19,7 +19,7 @@ class FrontierPolicyTests(unittest.TestCase):
             admission = n['kind'] == 'admission'
             self.rows.append({'declaration': n['declaration'], 'is_theorem': n['kind'] != 'verification_contract',
                               'direct_sorry': admission, 'shape_hash': n['reviewed_shape_hash'], 'blueprint_label': n['label'],
-                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or any(self.nodes[d]['kind'] == 'verification_contract' for d in n.get('required_type_dependencies', [])) or n['id'] in ['balance-uninitialized-accepted', 'balance-uninitialized-safety', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-absent-parser-complement', 'global', 'balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue', 'balance-outside-array-accepted', 'balance-outside-array-no-issue', 'balance-other-accepted', 'balance-other-no-issue', 'balance-no-issue', 'balance-accepted', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
+                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or any(self.nodes[d]['kind'] == 'verification_contract' for d in n.get('required_type_dependencies', [])) or n['id'] in ['balance-uninitialized-rejected-safety', 'balance-initialized-rejected-safety', 'balance-uninitialized-accepted', 'balance-uninitialized-safety', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-absent-parser-complement', 'global', 'balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue', 'balance-outside-array-accepted', 'balance-outside-array-no-issue', 'balance-other-accepted', 'balance-other-no-issue', 'balance-no-issue', 'balance-accepted', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
                               'type_dependencies': [], 'proof_dependencies': [], 'statement': 'test', 'type_hash': 1})
         self.by_id = {n['id']: row for n, row in zip(self.manifest['nodes'], self.rows)}
         for n in self.manifest['nodes']:
@@ -43,6 +43,8 @@ class FrontierPolicyTests(unittest.TestCase):
         self.by_id['balance-export-state-six-grows']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-exact-gas', 'balance-room-after-state']]
         self.by_id['balance-uninitialized-accepted']['axioms'].append('sorryAx')
         self.by_id['balance-uninitialized-safety']['axioms'].append('sorryAx')
+        self.by_id['balance-uninitialized-rejected-safety']['axioms'].append('sorryAx')
+        self.by_id['balance-initialized-rejected-safety']['axioms'].append('sorryAx')
         self.by_id['balance-other-state-accepted']['axioms'].append('sorryAx')
         self.by_id['balance-other-input-state-safety']['axioms'].append('sorryAx')
         self.by_id['balance-absent-parser-complement']['axioms'].append('sorryAx')
@@ -806,7 +808,7 @@ class FrontierPolicyTests(unittest.TestCase):
                      'balance-other-input-state-safety', 'present-budget-from-linear', 'present-concrete-object-provider', 'global']:
             self.assertEqual(result[node]['status'], 'Conditional')
             self.assertFalse(result[node]['direct_sorry'])
-        for node in ['balance-uninitialized-rejected-safety', 'balance-initialized-rejected-safety', 'pinned-arguments-limit', 'balance-rejected',
+        for node in ['balance-uninitialized-rejected-run', 'balance-initialized-rejected-run', 'pinned-arguments-limit', 'balance-rejected',
                      'ignore-hyp', 'key-conditions', 'value-conditions', 'present-model-budget', 'present-deployed-provider']:
             self.assertEqual(result[node]['status'], 'Open')
         for source, caller in [('initialized-accepted-under-limit', 'balance-other-state-accepted'),
@@ -848,8 +850,8 @@ class FrontierPolicyTests(unittest.TestCase):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_precise_uninitialized_admission_cannot_be_presented_as_complete(self):
-        self.nodes['balance-uninitialized-rejected-safety']['kind'] = 'theorem'
-        self.by_id['balance-uninitialized-rejected-safety']['direct_sorry'] = False
+        self.nodes['balance-uninitialized-rejected-run']['kind'] = 'theorem'
+        self.by_id['balance-uninitialized-rejected-run']['direct_sorry'] = False
         with self.assertRaisesRegex(ValueError, 'Admission frontier changed'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
@@ -866,7 +868,7 @@ class FrontierPolicyTests(unittest.TestCase):
         for node in ['none-accepted-under-limit', 'balance-uninitialized-accepted', 'balance-uninitialized-safety', 'global']:
             self.assertEqual(result[node]['status'], 'Conditional')
             self.assertFalse(result[node]['direct_sorry'])
-        for node in ['balance-uninitialized-rejected-safety', 'balance-initialized-rejected-safety', 'pinned-arguments-limit',
+        for node in ['balance-uninitialized-rejected-run', 'balance-initialized-rejected-run', 'pinned-arguments-limit',
                      'none-deployed-provider', 'none-entry-contract', 'none-model-budget-contract', 'ignore-hyp', 'key-conditions', 'value-conditions']:
             self.assertEqual(result[node]['status'], 'Open')
         for source, caller in [('none-accepted-under-limit', 'balance-uninitialized-accepted'),
@@ -949,8 +951,8 @@ class FrontierPolicyTests(unittest.TestCase):
             self.assertEqual(nodes[id]['status'], 'Proven')
             self.assertFalse(nodes[id]['direct_sorry'])
             self.assertFalse(nodes[id]['type_edges'])
-        for id in ['balance-rejected', 'balance-initialized-rejected-safety',
-                   'balance-uninitialized-rejected-safety', 'reject-parser']:
+        for id in ['balance-rejected', 'balance-initialized-rejected-run',
+                   'balance-uninitialized-rejected-run', 'reject-parser']:
             self.assertEqual(nodes[id]['status'], 'Open')
 
     def test_rejected_balance_integration_cannot_drop_actual_code_or_entry(self):
@@ -1015,7 +1017,7 @@ class FrontierPolicyTests(unittest.TestCase):
         for id in ['serde-string-adapter', 'serde-formatter-adapter']:
             self.assertEqual(nodes[id]['status'], 'Conditional')
         for id in ['serde-string-engine', 'serde-formatter-engine', 'balance-rejected',
-                   'balance-initialized-rejected-safety', 'balance-uninitialized-rejected-safety', 'reject-parser']:
+                   'balance-initialized-rejected-run', 'balance-uninitialized-rejected-run', 'reject-parser']:
             self.assertEqual(nodes[id]['status'], 'Open')
         self.assertEqual(nodes['global']['status'], 'Conditional')
 
@@ -1064,7 +1066,7 @@ class FrontierPolicyTests(unittest.TestCase):
             self.assertFalse(nodes[id]['direct_sorry'])
         for id in ['serde-code-string-writer', 'serde-error-envelope-writer',
                    'serde-debug-uniform-cost', 'balance-rejected',
-                   'balance-initialized-rejected-safety', 'balance-uninitialized-rejected-safety']:
+                   'balance-initialized-rejected-run', 'balance-uninitialized-rejected-run']:
             self.assertEqual(nodes[id]['status'], 'Open')
         self.assertEqual(nodes['global']['status'], 'Conditional')
 
@@ -1199,6 +1201,152 @@ class FrontierPolicyTests(unittest.TestCase):
             row['shape_hash'] += 1
             with self.assertRaises(ValueError):
                 blueprint.classify(self.manifest, rows)
+
+    def test_oversized_panic_host_and_actual_dispatch_are_independently_proven(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['panic-large-read', 'panic-large-charges', 'panic-large-invoke', 'panic-large-host-contract',
+                   'panic-large-no-issue', 'panic-large-not-out-of-gas', 'panic-message-size-cases',
+                   'panic-large-trampoline', 'panic-large-interface', 'panic-large-env', 'panic-total-no-issue',
+                   'panic-total-not-out-of-gas', 'panic-total-erase', 'panic-total-erase-proof', 'panic-total-host-fields']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+            self.assertFalse(nodes[id]['type_edges'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+
+    def test_total_panic_keeps_payload_and_to_string_instances_open(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['panic-large-hook', 'panic-total-hook', 'panic-total-callback']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[id]['type_edges'], ['reject-to-string-spec'])
+        self.assertEqual(set(nodes['panic-total-with-hook']['type_edges']),
+                         {'reject-payload-get-spec', 'reject-to-string-spec'})
+        for id in ['reject-payload-get-spec', 'reject-to-string-spec', 'panic-total-common-spec',
+                   'reject-common-panic-spec', 'recorded-failure-run']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+
+    def test_constructed_rejection_route_does_not_assume_the_common_entry(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['panic-total-expect-full', 'balance-reject-total-constructed']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(set(nodes[id]['type_edges']), {'reject-payload-get-spec', 'reject-to-string-spec'})
+            self.assertNotIn('panic-total-common-spec', nodes[id]['type_edges'])
+            self.assertNotIn('reject-common-panic-spec', nodes[id]['type_edges'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        for id in ['panic-total-expect-entry', 'balance-reject-total-block', 'panic-total-816',
+                   'panic-total-823', 'panic-total-859']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[id]['type_edges'], ['panic-total-common-spec'])
+
+    def test_recorded_failure_receipt_cannot_close_without_complete_method_run(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['recorded-failure-funded-vm', 'recorded-failure-any-gas-vm', 'recorded-failure-receipt-safety']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[id]['type_edges'], ['recorded-failure-run'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        for id in ['recorded-failure-outcome', 'recorded-failure-observe']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+        self.assertEqual(nodes['recorded-failure-run']['status'], 'Open')
+        for id in ['balance-rejected', 'balance-uninitialized-rejected-run', 'balance-initialized-rejected-run']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+        self.assertEqual(nodes['global']['status'], 'Conditional')
+
+    def test_total_panic_required_run_and_formatter_dependencies_cannot_disappear(self):
+        for id, dependency in [('recorded-failure-receipt-safety', 'recorded-failure-run'),
+                               ('recorded-failure-any-gas-vm', 'recorded-failure-run'),
+                               ('balance-reject-total-constructed', 'reject-payload-get-spec'),
+                               ('balance-reject-total-constructed', 'reject-to-string-spec')]:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['type_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_total_panic_preserves_actual_host_to_rejection_composition_edges(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for source, caller in [('panic-large-read', 'panic-large-charges'),
+                               ('panic-large-invoke', 'panic-large-host-contract'),
+                               ('panic-large-host-contract', 'panic-large-trampoline'),
+                               ('panic-large-trampoline', 'panic-large-interface'),
+                               ('panic-large-interface', 'panic-large-env'),
+                               ('panic-large-env', 'panic-large-hook'),
+                               ('panic-large-hook', 'panic-total-hook'),
+                               ('panic-total-hook', 'panic-total-callback'),
+                               ('panic-total-callback', 'panic-total-with-hook'),
+                               ('panic-total-with-hook', 'panic-total-common-instance'),
+                               ('panic-total-expect-full', 'balance-reject-total-constructed')]:
+            self.assertIn(caller, {x['id'] for x in nodes[source]['integrated_into']})
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[caller]['declaration'])
+            row['proof_dependencies'].remove(self.nodes[source]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_total_receipt_observation_preserves_checked_runtime_composition(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for source, caller in [('recorded-failure-outcome', 'recorded-failure-any-gas-vm'),
+                               ('recorded-failure-any-gas-vm', 'recorded-failure-receipt-safety'),
+                               ('recorded-failure-observe', 'recorded-failure-receipt-safety')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, nodes[source]['integrated_into'])
+        for id in ['ignore-hyp', 'key-conditions', 'value-conditions', 'serde-error-envelope-writer',
+                   'serde-debug-uniform-cost']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+
+    def test_total_panic_error_and_observation_shapes_remain_reviewed(self):
+        for id in ['panic-large-host-contract', 'panic-total-hook', 'balance-reject-total-constructed',
+                   'recorded-failure-run', 'recorded-failure-observe', 'recorded-failure-receipt-safety']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['shape_hash'] += 1
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_total_panic_instruction_results_cannot_hide_an_admission(self):
+        for id in ['panic-large-host-contract', 'balance-reject-total-constructed', 'recorded-failure-receipt-safety']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['direct_sorry'] = True
+            row['axioms'].append('sorryAx')
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_actual_exported_rejected_receipt_keeps_method_run_open(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['panic-total-receipt-safety', 'balance-reject-receipt-composition']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[id]['type_edges'], ['recorded-failure-run'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        for source, caller in [('panic-total-no-issue', 'panic-total-receipt-safety'),
+                               ('panic-total-erase-proof', 'panic-total-receipt-safety'),
+                               ('recorded-failure-receipt-safety', 'panic-total-receipt-safety'),
+                               ('panic-total-receipt-safety', 'balance-reject-receipt-composition')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, nodes[source]['integrated_into'])
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[caller]['declaration'])
+            row['proof_dependencies'].remove(self.nodes[source]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+        self.assertEqual(nodes['panic-local-receipt-projection']['status'], 'Proven')
+        self.assertEqual(nodes['recorded-failure-run']['status'], 'Open')
+
+    def test_rejected_safety_composes_precise_method_runs_and_stays_incomplete(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for state in ['uninitialized', 'initialized']:
+            caller = 'balance-' + state + '-rejected-safety'
+            leaf = 'balance-' + state + '-rejected-run'
+            self.assertEqual(nodes[caller]['status'], 'Conditional')
+            self.assertFalse(nodes[caller]['direct_sorry'])
+            self.assertIn('sorryAx', nodes[caller]['axioms'])
+            self.assertEqual(nodes[leaf]['status'], 'Open')
+            self.assertTrue(nodes[leaf]['direct_sorry'])
+            self.assertIn({'id': caller, 'status': 'Conditional'}, nodes[leaf]['integrated_into'])
+            for dependency in [leaf, 'rejected-receipt-plan-composition']:
+                rows = copy.deepcopy(self.rows)
+                row = next(r for r in rows if r['declaration'] == self.nodes[caller]['declaration'])
+                row['proof_dependencies'].remove(self.nodes[dependency]['declaration'])
+                with self.assertRaises(ValueError):
+                    blueprint.classify(self.manifest, rows, self.audit)
+        self.assertEqual(nodes['rejected-method-run-plan']['status'], 'Open')
+        self.assertEqual(nodes['rejected-receipt-plan-composition']['status'], 'Conditional')
+        self.assertEqual(nodes['global']['status'], 'Conditional')
 
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}

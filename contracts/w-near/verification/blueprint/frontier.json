@@ -10305,14 +10305,16 @@
     {
       "id": "balance-initialized-rejected-safety",
       "declaration": "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation",
-      "title": "Rejected initialized balance input: execution-safety frontier",
-      "kind": "admission",
+      "title": "Checked initialized rejected balance safety from the exact method run",
+      "kind": "theorem",
       "label": "frontier:balance-initialized-rejected-safety",
-      "notes": "Exact remaining execution-safety obligation for initialized state with no accepted balance-query parse. Original runtime, represented storage, well-formed context and method premises are retained. Accepted initialized calls are excluded precisely.",
+      "notes": "Original full-context binary/runtime/represented-state/context/method/rejected-input statement is unchanged. Its proof now composes exact function-297 receipt rollback/no-issue from the named complete rejected method run. Conditional through that precise Open run obligation; actual parser ownership, formatting, uniform cost and execution remain unfinished.",
       "required_type_dependencies": [],
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 2954860839,
-      "indirect_admission": true
+      "required_proof_dependencies": [
+        "rejected-receipt-plan-composition",
+        "balance-initialized-rejected-run"
+      ],
+      "reviewed_shape_hash": 2954860839
     },
     {
       "id": "none-state-read",
@@ -10742,14 +10744,16 @@
     {
       "id": "balance-uninitialized-rejected-safety",
       "declaration": "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation",
-      "title": "Rejected uninitialized balance input: execution-safety frontier",
-      "kind": "admission",
+      "title": "Checked uninitialized rejected balance safety from the exact method run",
+      "kind": "theorem",
       "label": "frontier:balance-uninitialized-rejected-safety",
-      "notes": "Exact remaining no-execution-issue obligation for represented uninitialized state with no accepted balance parse. Original binary/runtime/context premises are retained; completed accepted receipts are excluded precisely.",
+      "notes": "Original full-context binary/runtime/represented-state/context/method/rejected-input statement is unchanged. Its proof now composes exact function-297 receipt rollback/no-issue from the named complete rejected method run. Conditional through that precise Open run obligation; actual parser ownership, formatting, uniform cost and execution remain unfinished.",
       "required_type_dependencies": [],
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 2663222250,
-      "indirect_admission": true
+      "required_proof_dependencies": [
+        "rejected-receipt-plan-composition",
+        "balance-uninitialized-rejected-run"
+      ],
+      "reviewed_shape_hash": 2663222250
     },
     {
       "id": "none-model-budget-contract",
@@ -11609,6 +11613,598 @@
         "serde-error-debug-dispatch"
       ],
       "reviewed_shape_hash": 247278797
+    },
+    {
+      "id": "panic-large-read",
+      "declaration": "NearLogic.PanicUtf8Large.panicUtf8Read_large",
+      "title": "Oversized explicit panic fails before reading message memory",
+      "kind": "theorem",
+      "label": "frontier:panic-large-read",
+      "notes": "Actual panicUtf8Read reports totalLogLengthExceeded before any memory/UTF8 read. Explicit-length, configured remaining log capacity and oversize premises are precise local environmental cases; no universal log-fit premise is imposed.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1380003226
+    },
+    {
+      "id": "panic-large-charges",
+      "declaration": "NearLogic.PanicUtf8Large.chargesBefore_large",
+      "title": "Oversized panic charges exactly two base operations",
+      "kind": "theorem",
+      "label": "frontier:panic-large-charges",
+      "notes": "Actual metering selects only base and utf8_decoding_base; memory-byte and decode-byte charges are absent on this protocol failure branch.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "panic-large-read"
+      ],
+      "reviewed_shape_hash": 3337537910
+    },
+    {
+      "id": "panic-large-invoke",
+      "declaration": "NearLogic.PanicUtf8Large.panicUtf8_large",
+      "title": "Actual metered oversized panic preserves memory and host effects",
+      "kind": "theorem",
+      "label": "frontier:panic-large-invoke",
+      "notes": "Exact host invocation traps with the real size-limit message and error, unchanged memory, erased host state except lastError, exact two-charge gas use and retained gas ceilings.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "panic-large-charges",
+        "panic-large-read"
+      ],
+      "reviewed_shape_hash": 2012708597
+    },
+    {
+      "id": "panic-large-host-contract",
+      "declaration": "NearLogic.PanicUtf8Large.panicUtf8_large_contract",
+      "title": "Oversized panic has a checked exact TrapContractP",
+      "kind": "theorem",
+      "label": "frontier:panic-large-host-contract",
+      "notes": "Host trap interface is proved with an empty memory ownership range because the oversized branch never reads the pointer. Exact error, gas, memory and erased-state clauses are retained.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "panic-large-invoke"
+      ],
+      "reviewed_shape_hash": 3792908115
+    },
+    {
+      "id": "panic-large-no-issue",
+      "declaration": "NearLogic.PanicUtf8Large.largeError_no_issue",
+      "title": "Size-limit panic error is a concrete protocol failure",
+      "kind": "theorem",
+      "label": "frontier:panic-large-no-issue",
+      "notes": "Kernel reduction proves this precise error has no execution issue. It does not excuse an unsupported host operation or an internal VM failure.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2656661437
+    },
+    {
+      "id": "panic-large-not-out-of-gas",
+      "declaration": "NearLogic.PanicUtf8Large.largeError_not_out_of_gas",
+      "title": "Size-limit error differs from gas exhaustion",
+      "kind": "theorem",
+      "label": "frontier:panic-large-not-out-of-gas",
+      "notes": "The oversized-message protocol failure is classified exactly; no change to the contract resource-failure semantics.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 556633796
+    },
+    {
+      "id": "panic-message-size-cases",
+      "declaration": "NearLogic.PanicUtf8Large.log_length_cases",
+      "title": "Nonempty messages either fit or exceed remaining log capacity",
+      "kind": "theorem",
+      "label": "frontier:panic-message-size-cases",
+      "notes": "Checked exhaustive case split on actual optional maxLogLen and existing logs. This avoids restricting deployed rejected inputs to messages that fit.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3352289045
+    },
+    {
+      "id": "panic-large-trampoline",
+      "declaration": "WNear.Binary.PanicTotal.f262_large",
+      "title": "Actual panic trampoline consumes oversized host contract",
+      "kind": "theorem",
+      "label": "frontier:panic-large-trampoline",
+      "notes": "Function 262 invokes actual panic_utf8 and preserves the exact protocol error and single credit resource, with no message-memory-read assumption.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "panic-large-host-contract"
+      ],
+      "reviewed_shape_hash": 4046460254
+    },
+    {
+      "id": "panic-large-interface",
+      "declaration": "WNear.Binary.PanicTotal.f448_large",
+      "title": "Installed blockchain interface dispatches oversized panic",
+      "kind": "theorem",
+      "label": "frontier:panic-large-interface",
+      "notes": "Actual RefCell/installed-interface function 448 reaches the checked trampoline. Exact installed table, stack and one global/credit resources are used.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "panic-large-trampoline"
+      ],
+      "reviewed_shape_hash": 1131512901
+    },
+    {
+      "id": "panic-large-env",
+      "declaration": "WNear.Binary.PanicTotal.f521_large",
+      "title": "Actual env panic_str handles oversized explicit messages",
+      "kind": "theorem",
+      "label": "frontier:panic-large-env",
+      "notes": "Function 521 composes the installed interface and actual host branch. Its cost is the original regular operations plus the two base host charges.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "panic-large-interface"
+      ],
+      "reviewed_shape_hash": 1421815918
+    },
+    {
+      "id": "panic-large-hook",
+      "declaration": "WNear.Binary.PanicTotal.f474_large",
+      "title": "Actual SDK hook reaches oversized protocol failure",
+      "kind": "theorem",
+      "label": "frontier:panic-large-hook",
+      "notes": "The real hook formats owned bytes via named ToStr, then invokes actual env panic_str. No UTF8 or memory-read proof is required for the host oversized branch, and no nonempty ownership is invented.",
+      "required_type_dependencies": [
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-large-env"
+      ],
+      "reviewed_shape_hash": 3412403759
+    },
+    {
+      "id": "panic-trap-cost-mono",
+      "declaration": "WNear.Binary.PanicTotal.trap_cost_mono",
+      "title": "Trap cost weakening preserves the single credit resource",
+      "kind": "theorem",
+      "label": "frontier:panic-trap-cost-mono",
+      "notes": "Checked generic cost monotonicity for exact trap specifications; no second gas cell or duplicated credit is introduced.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3381866464
+    },
+    {
+      "id": "panic-large-cost-bound",
+      "declaration": "WNear.Binary.PanicTotal.largeUse_le",
+      "title": "Oversized host cost fits the original panic upper bound",
+      "kind": "theorem",
+      "label": "frontier:panic-large-cost-bound",
+      "notes": "The two actual base charges are bounded by the unchanged panicUtf8Use budget for every length.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4009252627
+    },
+    {
+      "id": "panic-total-hook",
+      "declaration": "WNear.Binary.PanicTotal.f474_total",
+      "title": "SDK panic hook composes both message-size branches",
+      "kind": "theorem",
+      "label": "frontier:panic-total-hook",
+      "notes": "Exact expectedError chooses guestPanic for fitting messages and totalLogLengthExceeded for oversized messages. Original cost474 bound, byte-length/UTF8 and read-cost bounds are preserved; LogFits is no longer required. Named ToStr remains unresolved.",
+      "required_type_dependencies": [
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-large-hook",
+        "panic-message-size-cases",
+        "panic-trap-cost-mono",
+        "panic-large-cost-bound"
+      ],
+      "reviewed_shape_hash": 2141148997
+    },
+    {
+      "id": "panic-total-no-issue",
+      "declaration": "WNear.Binary.PanicTotal.expectedError_no_issue",
+      "title": "Both selected panic errors have no execution issue",
+      "kind": "theorem",
+      "label": "frontier:panic-total-no-issue",
+      "notes": "Kernel-checked exact error classification covers both actual host branches. No assumption that arbitrary failures are acceptable.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2965640550
+    },
+    {
+      "id": "panic-total-not-out-of-gas",
+      "declaration": "WNear.Binary.PanicTotal.expectedError_not_out_of_gas",
+      "title": "Both selected panic errors retain exact gas classification",
+      "kind": "theorem",
+      "label": "frontier:panic-total-not-out-of-gas",
+      "notes": "Both selected host errors are concretely not out of gas; original receipt resource alternatives are unchanged.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 721243224
+    },
+    {
+      "id": "panic-total-callback",
+      "declaration": "WNear.Binary.PanicTotal.f473_total",
+      "title": "Installed hook callback composes the total panic hook",
+      "kind": "theorem",
+      "label": "frontier:panic-total-callback",
+      "notes": "Actual function 473 invokes the checked two-branch hook, retaining the original callback cost and stack/host ownership.",
+      "required_type_dependencies": [
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-hook"
+      ],
+      "reviewed_shape_hash": 3987824676
+    },
+    {
+      "id": "panic-total-with-hook",
+      "declaration": "WNear.Binary.PanicTotal.f824_total",
+      "title": "rust panic_with_hook consumes exact payload and to-string contracts",
+      "kind": "theorem",
+      "label": "frontier:panic-total-with-hook",
+      "notes": "Actual function 824 composes both message-size branches through the callback. GetSpec and ToStr remain named verification inputs; old cost824, owned payload/frame and one global/credit resource are preserved.",
+      "required_type_dependencies": [
+        "reject-payload-get-spec",
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-callback"
+      ],
+      "reviewed_shape_hash": 1898176500
+    },
+    {
+      "id": "panic-total-common-spec",
+      "declaration": "WNear.Binary.PanicTotal.Spec817Total",
+      "title": "Exact common panic contract covers both protocol outcomes",
+      "kind": "verification_contract",
+      "label": "frontier:panic-total-common-spec",
+      "notes": "Named common-entry interface remains Open as a generic family. Specific checked constructors can supply it, but arbitrary payload Get, formatting and method-run instances remain unfinished. Old Spec817 is unchanged.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 12182514346256336710
+    },
+    {
+      "id": "panic-total-common-instance",
+      "declaration": "WNear.Binary.PanicTotal.f817_fmt_total",
+      "title": "Formatted common panic entry constructs its total interface",
+      "kind": "theorem",
+      "label": "frontier:panic-total-common-instance",
+      "notes": "Actual function 817 constructs the new common contract from exact payload GetSpec and ToStr for the formatted-Arguments branch, with original cost817 and actual payload/environment. No LogFits premise. Generic interface stays Open.",
+      "required_type_dependencies": [
+        "panic-total-common-spec",
+        "reject-payload-get-spec",
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-with-hook"
+      ],
+      "reviewed_shape_hash": 238671867
+    },
+    {
+      "id": "panic-total-common-frame",
+      "declaration": "WNear.Binary.PanicTotal.Spec817Total_mono",
+      "title": "Common panic contract preserves additional owned caller resources",
+      "kind": "theorem",
+      "label": "frontier:panic-total-common-frame",
+      "notes": "Checked frame conversion for the exact two-branch common-entry interface. Does not discharge its concrete instance obligation.",
+      "required_type_dependencies": [
+        "panic-total-common-spec"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3737711725
+    },
+    {
+      "id": "panic-total-816",
+      "declaration": "WNear.Binary.PanicTotal.f816_total",
+      "title": "Actual panic formatter wrapper consumes total common entry",
+      "kind": "theorem",
+      "label": "frontier:panic-total-816",
+      "notes": "Function 816 preserves the actual frame and exact selected error, conditional on the named common-entry instance.",
+      "required_type_dependencies": [
+        "panic-total-common-spec"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2263001968
+    },
+    {
+      "id": "panic-total-823",
+      "declaration": "WNear.Binary.PanicTotal.f823_total",
+      "title": "Actual panic branch composes the formatter wrapper",
+      "kind": "theorem",
+      "label": "frontier:panic-total-823",
+      "notes": "Function 823 reaches the total formatter wrapper with exact message/info/location and caller resources.",
+      "required_type_dependencies": [
+        "panic-total-common-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-816"
+      ],
+      "reviewed_shape_hash": 2839825052
+    },
+    {
+      "id": "panic-total-859",
+      "declaration": "WNear.Binary.PanicTotal.f859_total",
+      "title": "Actual panic_fmt constructs its Arguments branch",
+      "kind": "theorem",
+      "label": "frontier:panic-total-859",
+      "notes": "Function 859 reaches the total panic branch, preserving all argument fields and the one credit/global state.",
+      "required_type_dependencies": [
+        "panic-total-common-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-823"
+      ],
+      "reviewed_shape_hash": 2196602287
+    },
+    {
+      "id": "panic-total-expect-entry",
+      "declaration": "WNear.Binary.PanicTotal.f881_total_spec",
+      "title": "Actual unwrap-failure entry consumes exact total panic interface",
+      "kind": "theorem",
+      "label": "frontier:panic-total-expect-entry",
+      "notes": "Function 881 uses the precise common contract for either host error. Original 250-operation overhead, owned stack and expect-error descriptor are retained.",
+      "required_type_dependencies": [
+        "panic-total-common-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-859"
+      ],
+      "reviewed_shape_hash": 1763357531
+    },
+    {
+      "id": "panic-total-expect-full",
+      "declaration": "WNear.Binary.PanicTotal.f881_total_full",
+      "title": "Unwrap-failure entry constructs its whole common panic path",
+      "kind": "theorem",
+      "label": "frontier:panic-total-expect-full",
+      "notes": "Constructs Spec817Total from GetSpec and ToStr before composing all actual wrappers. The common panic contract is no longer an input premise; exact owned payload, deep stack, environment and cost817 remain. Actual Get/ToStr instances remain Conditional.",
+      "required_type_dependencies": [
+        "reject-payload-get-spec",
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-expect-entry",
+        "panic-total-common-instance",
+        "panic-total-common-frame"
+      ],
+      "reviewed_shape_hash": 1973110213
+    },
+    {
+      "id": "balance-reject-total-block",
+      "declaration": "WNear.Binary.PanicTotal.parser_handoff_reject_total",
+      "title": "Rejected balance handoff invokes exact two-branch panic entry",
+      "kind": "theorem",
+      "label": "frontier:balance-reject-total-block",
+      "notes": "Actual rejected result-tag branch of function 297 stores the error pointer and calls function 881. Preserves exact host error, old 300-operation overhead and one credit resource; conditional on named common panic contract.",
+      "required_type_dependencies": [
+        "panic-total-common-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-expect-entry",
+        "balance-reject-handoff-code"
+      ],
+      "reviewed_shape_hash": 604357158
+    },
+    {
+      "id": "balance-reject-total-constructed",
+      "declaration": "WNear.Binary.PanicTotal.parser_handoff_reject_total_full",
+      "title": "Rejected balance handoff constructs the complete panic entry",
+      "kind": "theorem",
+      "label": "frontier:balance-reject-total-constructed",
+      "notes": "Actual function-297 rejection branch constructs the panic entry from explicit GetSpec and ToStr, retaining error/tag/output ownership, full deep stack, env, actual location and old cost. No whole common-entry premise or universal LogFits assumption remains. Parser-owned error production, formatting, uniform cost and complete receipt run are not discharged.",
+      "required_type_dependencies": [
+        "reject-payload-get-spec",
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-expect-full",
+        "balance-reject-handoff-code"
+      ],
+      "reviewed_shape_hash": 3570192162
+    },
+    {
+      "id": "panic-total-erase",
+      "declaration": "WNear.Binary.PanicTotal.expectedError_erase",
+      "title": "Selected error is stable under gas erasure",
+      "kind": "theorem",
+      "label": "frontier:panic-total-erase",
+      "notes": "Actual message-size decision and exact error are invariant when only gas counters are erased.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3622292253
+    },
+    {
+      "id": "panic-total-erase-proof",
+      "declaration": "WNear.Binary.PanicTotal.expectedError_eraseP",
+      "title": "Selected error is stable under gas and recorded-proof erasure",
+      "kind": "theorem",
+      "label": "frontier:panic-total-erase-proof",
+      "notes": "Gas/proof relaxation retains the actual configured log limit, logs and exact host-error choice used in receipt composition.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1446948436
+    },
+    {
+      "id": "panic-total-host-fields",
+      "declaration": "WNear.Binary.PanicTotal.failedHost_fields",
+      "title": "Exact trap post supplies final receipt host fields",
+      "kind": "theorem",
+      "label": "frontier:panic-total-host-fields",
+      "notes": "Extracts exact lastError and preserved absence of execution issue from erased-host equality. Initial no-issue is an explicit premise; no host state is invented.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2904261392
+    },
+    {
+      "id": "recorded-failure-run",
+      "declaration": "WNear.Binary.RecordedFailure.RecordedFailureRun",
+      "title": "Complete recorded-failure method run remains a verification obligation",
+      "kind": "verification_contract",
+      "label": "frontier:recorded-failure-run",
+      "notes": "Exact wrapper of existing MethodPanicsR: every initial host/fuel/gas ceiling meeting the precondition must produce the actual method trap, final host relation and gas bound. This generic contract remains Open until concrete method runs are supplied; no deployed input is excluded.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 6285585455571649370
+    },
+    {
+      "id": "recorded-failure-outcome",
+      "declaration": "WNear.Binary.RecordedFailure.outcome_failure",
+      "title": "Actual recorded host trap preserves exact VM outcome",
+      "kind": "theorem",
+      "label": "frontier:recorded-failure-outcome",
+      "notes": "Checked trapError and checkReceipts observation retains exact host error, no return data or receipts, logs and burnt gas. Final lastError and absence of execution issue are explicit host premises.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1263419237
+    },
+    {
+      "id": "recorded-failure-funded-vm",
+      "declaration": "WNear.Binary.RecordedFailure.method_vmOutcomeFailure",
+      "title": "Funded method run reaches exact recorded failure",
+      "kind": "theorem",
+      "label": "frontier:recorded-failure-funded-vm",
+      "notes": "Composes loading, fuel and a named complete method run to exact VM failure with original gas ceiling. Conditional on RecordedFailureRun; no method execution is assumed completed.",
+      "required_type_dependencies": [
+        "recorded-failure-run"
+      ],
+      "required_proof_dependencies": [
+        "recorded-failure-outcome"
+      ],
+      "reviewed_shape_hash": 2533717597
+    },
+    {
+      "id": "recorded-failure-any-gas-vm",
+      "declaration": "WNear.Binary.RecordedFailure.method_vm_anyFailure",
+      "title": "Any-gas comparison retains recorded failure or resource failure",
+      "kind": "theorem",
+      "label": "frontier:recorded-failure-any-gas-vm",
+      "notes": "Uses the existing checked gas/fuel/proof relaxation to compare actual method execution with the named complete run. Exact host failure or existing resource-failure alternative, with preserved logs. Conditional on RecordedFailureRun.",
+      "required_type_dependencies": [
+        "recorded-failure-run"
+      ],
+      "required_proof_dependencies": [
+        "recorded-failure-outcome"
+      ],
+      "reviewed_shape_hash": 2639839617
+    },
+    {
+      "id": "recorded-failure-observe",
+      "declaration": "WNear.Binary.RecordedFailure.observe_failure",
+      "title": "Boundary observes exact host failure with rollback and no issue",
+      "kind": "theorem",
+      "label": "frontier:recorded-failure-observe",
+      "notes": "Checked observation retains the exact failureOf error and logs, rolls back storage/balance/usage/receipts, and excludes execution issues using the explicit concrete error classification. No arbitrary failure or weaker observation replaces the original boundary.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2537503912
+    },
+    {
+      "id": "recorded-failure-receipt-safety",
+      "declaration": "WNear.Binary.RecordedFailure.method_boundary_no_issue",
+      "title": "Complete recorded-failure run composes to full receipt safety",
+      "kind": "theorem",
+      "label": "frontier:recorded-failure-receipt-safety",
+      "notes": "Original full-context receipt execution rolls back and has no execution issue through exact failure or existing resource alternatives. Conditional on the named complete method run, precondition and exact final-host relation. It does not close rejected wNEAR receipts until the actual run and payload formatting are supplied.",
+      "required_type_dependencies": [
+        "recorded-failure-run"
+      ],
+      "required_proof_dependencies": [
+        "recorded-failure-any-gas-vm",
+        "recorded-failure-observe"
+      ],
+      "reviewed_shape_hash": 143010967
+    },
+    {
+      "id": "panic-local-receipt-projection",
+      "declaration": "WNear.Binary.PanicTotal.rejectedPanicPost_receipt",
+      "title": "Local exact panic post supplies receipt failure fields",
+      "kind": "theorem",
+      "label": "frontier:panic-local-receipt-projection",
+      "notes": "Checked projection from the local exact erased-host relation to the receipt error fields. Initial no-issue remains explicit; actual method input/storage register effects remain available to the full run.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2932151501
+    },
+    {
+      "id": "panic-total-receipt-safety",
+      "declaration": "WNear.Binary.PanicTotal.rejected_receipt_no_issue",
+      "title": "Actual selected panic errors compose to full receipt safety",
+      "kind": "theorem",
+      "label": "frontier:panic-total-receipt-safety",
+      "notes": "Instantiates generic receipt composition with the actual expectedError and checked gas/proof erasure invariance. Exact final error fields allow real register effects. Complete RecordedFailureRun and reachable precondition remain explicit unresolved inputs; no actual method run is assumed proved.",
+      "required_type_dependencies": [
+        "recorded-failure-run"
+      ],
+      "required_proof_dependencies": [
+        "recorded-failure-receipt-safety",
+        "panic-total-no-issue",
+        "panic-total-erase-proof"
+      ],
+      "reviewed_shape_hash": 2104726426
+    },
+    {
+      "id": "balance-reject-receipt-composition",
+      "declaration": "WNear.Binary.PanicTotal.balance_rejected_receipt_no_issue",
+      "title": "Exported ft_balance_of rejected panic route reaches receipt rollback and safety",
+      "kind": "theorem",
+      "label": "frontier:balance-reject-receipt-composition",
+      "notes": "Uses the actual function-297 export and type to compose the original full-context ft_balance_of receipt. Conditional on its exact complete RecordedFailureRun and reachable precondition. Parser-owned payloads, Get/ToStr, uniform cost and actual full rejected method execution remain unfinished.",
+      "required_type_dependencies": [
+        "recorded-failure-run"
+      ],
+      "required_proof_dependencies": [
+        "panic-total-receipt-safety"
+      ],
+      "reviewed_shape_hash": 524716535
+    },
+    {
+      "id": "balance-uninitialized-rejected-run",
+      "declaration": "WNear.ftBalanceOf_uninitialized_rejected_run_obligation",
+      "title": "Actual uninitialized rejected function-297 run remains Open",
+      "kind": "admission",
+      "label": "frontier:balance-uninitialized-rejected-run",
+      "notes": "Precise remaining plan for the actual complete method run: finite cost chosen before any gas ceiling, actual function 297, reachable gas/proof-relaxed host precondition, exact selected panic error and final no-issue fields. All original represented storage, well-formed context, pinned protocol, method and rejected-input premises are retained. Parser-owned payload, Get/ToStr, full input/rejection coverage and uniform cost must be constructed; no deployed input is narrowed.",
+      "required_type_dependencies": [
+        "rejected-method-run-plan"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2695247101,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-initialized-rejected-run",
+      "declaration": "WNear.ftBalanceOf_initialized_rejected_run_obligation",
+      "title": "Actual initialized rejected function-297 run remains Open",
+      "kind": "admission",
+      "label": "frontier:balance-initialized-rejected-run",
+      "notes": "Precise remaining plan for the actual complete method run: finite cost chosen before any gas ceiling, actual function 297, reachable gas/proof-relaxed host precondition, exact selected panic error and final no-issue fields. All original represented storage, well-formed context, pinned protocol, method and rejected-input premises are retained. Parser-owned payload, Get/ToStr, full input/rejection coverage and uniform cost must be constructed; no deployed input is narrowed.",
+      "required_type_dependencies": [
+        "rejected-method-run-plan"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2817538456,
+      "indirect_admission": true
+    },
+    {
+      "id": "rejected-method-run-plan",
+      "declaration": "WNear.Binary.PanicTotal.RejectedRunPlan",
+      "title": "Reachable complete rejected method-run plan remains unresolved",
+      "kind": "verification_contract",
+      "label": "frontier:rejected-method-run-plan",
+      "notes": "Precise existential Pre, finite cost and message bytes; complete actual function-297 RecordedFailureRun holds uniformly before the gas ceiling and Pre holds on the actual relaxed initial host. The full method endpoint records exact error fields while allowing actual input/storage register effects. Generic interface stays Open until concrete rejecting parser, formatting, cost and method execution instances are supplied.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "recorded-failure-run"
+      ],
+      "reviewed_shape_hash": 13361329779262558489
+    },
+    {
+      "id": "rejected-receipt-plan-composition",
+      "declaration": "WNear.Binary.PanicTotal.rejected_receipt_of_plan",
+      "title": "Complete rejected method plan composes to original receipt safety",
+      "kind": "theorem",
+      "label": "frontier:rejected-receipt-plan-composition",
+      "notes": "Checked exact full-context receipt execution, rollback and no execution issue from the named complete rejected method plan. Original method/runtime/domain remains unchanged; this result remains Conditional until the actual method plan is proved.",
+      "required_type_dependencies": [
+        "rejected-method-run-plan"
+      ],
+      "required_proof_dependencies": [
+        "balance-reject-receipt-composition"
+      ],
+      "reviewed_shape_hash": 3543930603
     }
   ],
   "reviewed_environment": [
@@ -11635,8 +12231,8 @@
     "WNear.storageBalanceOf_obligation",
     "WNear.ftBalanceOf_rejected_obligation",
     "WNear.pinned_arguments_obligation",
-    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation",
-    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation"
+    "WNear.ftBalanceOf_uninitialized_rejected_run_obligation",
+    "WNear.ftBalanceOf_initialized_rejected_run_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -11674,6 +12270,8 @@
     "WNear.ftBalanceOf_uninitialized_accepted_obligation",
     "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
     "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation",
-    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation"
+    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation",
+    "WNear.ftBalanceOf_uninitialized_rejected_run_obligation",
+    "WNear.ftBalanceOf_initialized_rejected_run_obligation"
   ]
 }

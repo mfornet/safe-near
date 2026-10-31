@@ -9648,6 +9648,126 @@ theorem WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode_eq :
   List.take 1 (List.drop 36 WNear.Binary.f297.body) = WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode
 ```
 
+## Bridge.Functions.BalanceOf297RejectPanicTotal
+
+`WNear.Binary.PanicTotal.expectedError_erase` (hash `00000000d7e7cb1d`)
+
+```lean
+theorem WNear.Binary.PanicTotal.expectedError_erase (h : Wasm.NearState) (bs : List UInt8) :
+  WNear.Binary.PanicTotal.expectedError (NearLogic.erase h) bs = WNear.Binary.PanicTotal.expectedError h bs
+```
+
+`WNear.Binary.PanicTotal.expectedError_eraseP` (hash `00000000563eae54`)
+
+```lean
+theorem WNear.Binary.PanicTotal.expectedError_eraseP (h : Wasm.NearState) (bs : List UInt8) :
+  WNear.Binary.PanicTotal.expectedError (NearLogic.eraseP h) bs = WNear.Binary.PanicTotal.expectedError h bs
+```
+
+`WNear.Binary.PanicTotal.failedHost_fields` (hash `00000000ad1b8310`)
+
+```lean
+theorem WNear.Binary.PanicTotal.failedHost_fields (h h' : Wasm.NearState) (bs : List UInt8)
+  (he :
+    NearLogic.erase h' =
+      NearLogic.erase
+        { storage := h.storage, storageAccounting := h.storageAccounting, storageProofSize := h.storageProofSize,
+          storageReadsFromTrie := h.storageReadsFromTrie, storageKeys := h.storageKeys, iterators := h.iterators,
+          nextIteratorId := h.nextIteratorId, registers := h.registers, context := h.context,
+          subsidizedAmount := h.subsidizedAmount, returnData := h.returnData, logs := h.logs,
+          promiseResults := h.promiseResults, promises := h.promises, gasWeights := h.gasWeights,
+          returnedPromise := h.returnedPromise, yieldResumes := h.yieldResumes, actionHash := h.actionHash,
+          existingYields := h.existingYields, config := h.config, randomSeed := h.randomSeed, gas := h.gas,
+          gasProfile := h.gasProfile, extCosts := h.extCosts, fees := h.fees,
+          outputDataReceivers := h.outputDataReceivers, lastError := some (WNear.Binary.PanicTotal.expectedError h bs),
+          lastExecutionIssue := h.lastExecutionIssue, yieldCreateToken := h.yieldCreateToken, crypto := h.crypto,
+          registerWrite := h.registerWrite, storageLog := h.storageLog, actionProfile := h.actionProfile })
+  (hi : h.lastExecutionIssue = none) :
+  h'.lastError = some (WNear.Binary.PanicTotal.expectedError h bs) ∧ h'.lastExecutionIssue = none
+```
+
+`WNear.Binary.PanicTotal.parser_handoff_reject_total` (hash `000000002405c226`)
+
+```lean
+theorem WNear.Binary.PanicTotal.parser_handoff_reject_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 5 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (s x1 : UInt32) (x2 : UInt64) (x3 err old : UInt32) (hs : 112 ≤ s.toNat) (hframe : s.toNat + 160 ≤ 2 ^ 32)
+  (E : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState) (bs : List UInt8) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        A 881 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[39]! inst WNear.Binary.f881 ∗
+          WNear.Binary.PanicTotal.Spec817Total cfg lim (d + 5) inst mi Cg n g gt (s - 64 - 16 - 16 - 16)
+              (s - 64 - 16 - 16 - 16) (s - 64 + 24) (s - 64 - 16) 1050984
+              iprop(n ↦[wms][ (s - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (s - 64 + 24) ∗
+                  WNear.Binary.PanicFmt.argsHead n (s - 64 + 24) 2 2 ∗
+                    WNear.Binary.PanicExpectError.expectErrArgs n (s - 64) 1050760 38 (s + 128) 1049036 ∗
+                      n ↦[wms][ s.toNat + 88 ] WasmLogic.bytes32 1 ∗
+                        n ↦[wms][ s.toNat + 92 ] WasmLogic.bytes32 err ∗
+                          n ↦[wms][ s.toNat + 128 ] WasmLogic.bytes32 err ∗ E)
+              K h bs ∗
+            NearLogic.credits Cg (300 * cfg.regularOpCost + K) ∗
+              g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                WNear.Binary.VecFromElem.stk n (s.toNat - 112) 112 ∗
+                  n ↦[wms][ s.toNat + 88 ] WasmLogic.bytes32 1 ∗
+                    n ↦[wms][ s.toNat + 92 ] WasmLogic.bytes32 err ∗
+                      n ↦[wms][ s.toNat + 128 ] WasmLogic.bytes32 old ∗
+                        E ∗
+                          ▷
+                            (WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs) -∗
+                              Φ.trap) ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) []
+      (List.take 1 (List.drop 36 WNear.Binary.f297.body)) Φ
+```
+
+`WNear.Binary.PanicTotal.parser_handoff_reject_total_full` (hash `00000000d4cccf22`)
+
+```lean
+theorem WNear.Binary.PanicTotal.parser_handoff_reject_total_full {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ)
+  (mi : Wasm.ModuleInst) (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 15 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp x1 : UInt32) (x2 : UInt64) (x3 err old lpc : UInt32) (S : ℕ) (hS : 32 ≤ S) (hsp : S + 192 ≤ sp.toNat)
+  (hal : sp.toNat % 8 = 0) (hframe : sp.toNat + 160 ≤ 2 ^ 32) (Ga G' D1 : Iris.IProp GF) (Kg K : ℕ) (bs : List UInt8)
+  (hpos : 0 < bs.length) (hlen : bs.length < 2 ^ 32) (hutf : Wasm.Near.validUtf8 bs = true) (h : Wasm.NearState)
+  (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        WNear.Binary.PanicFmt.code817 e inst mi A n mx ∗
+          A 826 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f826 ∗
+            WNear.Binary.PanicWithHook.GetSpec cfg lim (d + 7) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16 - 16 - 32)
+                (sp - 64 - 16 - 16 - 16 - 16) (sp - 64 - 16 - 16 - 16 - 16 + 4) 1066400 (S + 32) WNear.Binary.f826
+                iprop(WNear.Binary.PanicFmt.fmtPayload n (sp - 64 - 16 - 16 - 16 - 16) (sp - 64 + 24) ∗
+                    WNear.Binary.PanicFmt.argsHead n (sp - 64 + 24) 2 2 ∗
+                      WNear.Binary.PanicExpectError.expectErrArgs n (sp - 64) 1050760 38 (sp + 128) 1049036 ∗
+                        n ↦[wms][ sp.toNat + 88 ] WasmLogic.bytes32 1 ∗
+                          n ↦[wms][ sp.toNat + 92 ] WasmLogic.bytes32 err ∗
+                            n ↦[wms][ sp.toNat + 128 ] WasmLogic.bytes32 err ∗ Ga)
+                G' Kg ∗
+              WNear.Binary.PanicHook.ToStr cfg lim (d + 9) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16 - 16 - 32 - 32)
+                  (sp - 64 - 16 - 16 - 16 - 16 - 32 + 16) S
+                  iprop(WNear.Binary.PanicWithHook.infoCells n (sp - 64 - 16 - 16 - 16 - 16 - 32 + 16)
+                        (sp - 64 - 16 - 16 - 16 - 16 + 4) 1066400 (sp - 64 + 24) 1050984 ∗
+                      G' ∗ n ↦[wms][ (sp - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (sp - 64 + 24) ∗ D1)
+                  K bs ∗
+                A 881 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[39]! inst WNear.Binary.f881 ∗
+                  NearLogic.credits Cg
+                      (300 * cfg.regularOpCost + WNear.Binary.PanicFmt.cost817 cfg WNear.Binary.f826 Kg K bs h) ∗
+                    g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+                      WNear.Binary.VecFromElem.stk n (sp.toNat - 112) 112 ∗
+                        n ↦[wms][ sp.toNat + 88 ] WasmLogic.bytes32 1 ∗
+                          n ↦[wms][ sp.toNat + 92 ] WasmLogic.bytes32 err ∗
+                            n ↦[wms][ sp.toNat + 128 ] WasmLogic.bytes32 old ∗
+                              (WNear.Binary.VecFromElem.stk n ((sp - 64 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
+                                  Ga ∗ WNear.Binary.PanicFmt.envP n ta A lpc 1066360 179 (A 826) D1 h) ∗
+                                ▷
+                                  (WNear.Binary.PanicTotal.failedWith Cg h
+                                      (WNear.Binary.PanicTotal.expectedError h bs) -∗
+                                    Φ.trap) ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi sp x1 x2 x3) []
+      (List.take 1 (List.drop 36 WNear.Binary.f297.body)) Φ
+```
+
 ## Bridge.Functions.BalanceOf297Return
 
 `WNear.Binary.BalanceOf297AbsentCall.return_vec` (hash `000000000b35889c`)
@@ -11285,6 +11405,464 @@ theorem WNear.Binary.PanicExpectError.f881_spec {GF : Iris.BundledGFunctors} [Wa
             g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
               WNear.Binary.VecFromElem.stk n (sp.toNat - 112) 112 ∗ E))
       (fun x => 250 * cfg.regularOpCost + K) (fun x x_1 => iprop(False)) fun x => WNear.Binary.PanicStr.panicked Cg h bs
+```
+
+## Bridge.Functions.PanicLargeTrampoline
+
+`WNear.Binary.PanicTotal.f262_large` (hash `00000000f130155e`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f262_large {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e n a22 : ℕ) (mx : Option ℕ) (hn : mi.memAddrs[0]? = some n) (ha : mi.funcAddrs[22]? = some a22) (Cg : ℕ)
+  (h : Wasm.NearState) (dp : UInt32) (len ptr : UInt64) (limit : ℕ) (hlen : len ≠ Wasm.u64Max)
+  (hlimit : h.config.maxLogLen = some limit) (hlarge : limit - (List.map List.length h.logs).sum < len.toNat) :
+  a22 ↪[wf] Wasm.FuncInst.host (Wasm.Near.metered e "panic_utf8" Wasm.Near.panicUtf8Metered).toHostFn ∗
+      n ↪[wmlimit] mx ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f262 Cg (WNear.Binary.PanicStr.trampPre n h dp len ptr [])
+      (fun x => 3 * cfg.regularOpCost + NearLogic.PanicUtf8Large.largeUse h) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedLarge Cg h len limit
+```
+
+`WNear.Binary.PanicTotal.f448_large` (hash `0000000043718445`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f448_large {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 3 < lim.maxCallDepth) (Cg : ℕ) (gi : Wasm.GlobalInst) (sp : UInt32) (hgi : gi.value = Wasm.Value.i32 sp)
+  (hsp : 16 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (cp ptr len w0 w4 w8 w12 : UInt32) (h : Wasm.NearState) (limit : ℕ)
+  (hlimit : h.config.maxLogLen = some limit) (hlarge : limit - (List.map List.length h.logs).sum < len.toNat) :
+  WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗ WNear.Binary.PanicStr.panicCode e inst mi A ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f448 Cg
+      (WNear.Binary.PanicStr.withPre n g ta A gi sp cp ptr len [] w0 w4 w8 w12 h)
+      (fun x => 168 * cfg.regularOpCost + NearLogic.PanicUtf8Large.largeUse h) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedLarge Cg h (UInt64.ofNat len.toNat) limit
+```
+
+`WNear.Binary.PanicTotal.f521_large` (hash `0000000054bf306e`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f521_large {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 4 < lim.maxCallDepth) (Cg : ℕ) (gi : Wasm.GlobalInst) (sp : UInt32) (hgi : gi.value = Wasm.Value.i32 sp)
+  (hsp : 32 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (ptr len c0 c4 w0 w4 w8 w12 : UInt32) (h : Wasm.NearState) (limit : ℕ)
+  (hlimit : h.config.maxLogLen = some limit) (hlarge : limit - (List.map List.length h.logs).sum < len.toNat) :
+  A 448 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f448 ∗
+      WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗ WNear.Binary.PanicStr.panicCode e inst mi A ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f521 Cg
+      (WNear.Binary.PanicStr.pre n g ta A gi sp ptr len [] c0 c4 w0 w4 w8 w12 h)
+      (fun x => 194 * cfg.regularOpCost + NearLogic.PanicUtf8Large.largeUse h) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedLarge Cg h (UInt64.ofNat len.toNat) limit
+```
+
+`WNear.Binary.PanicTotal.failedLarge` (hash `d972d781eb2ebed7`)
+
+```lean
+def WNear.Binary.PanicTotal.failedLarge {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (Cg : ℕ)
+  (h : Wasm.NearState) (len : UInt64) (limit : ℕ) : Iris.IProp GF :=
+  fun limit =>
+    iprop(∃ h',
+        ⌜NearLogic.erase h' =
+              NearLogic.erase
+                { storage := h.storage, storageAccounting := h.storageAccounting,
+                  storageProofSize := h.storageProofSize,
+                  storageReadsFromTrie := h.storageReadsFromTrie, storageKeys := h.storageKeys,
+                  iterators := h.iterators, nextIteratorId := h.nextIteratorId,
+                  registers := h.registers, context := h.context,
+                  subsidizedAmount := h.subsidizedAmount, returnData := h.returnData,
+                  logs := h.logs, promiseResults := h.promiseResults, promises := h.promises,
+                  gasWeights := h.gasWeights, returnedPromise := h.returnedPromise,
+                  yieldResumes := h.yieldResumes, actionHash := h.actionHash,
+                  existingYields := h.existingYields, config := h.config,
+                  randomSeed := h.randomSeed, gas := h.gas, gasProfile := h.gasProfile,
+                  extCosts := h.extCosts, fees := h.fees,
+                  outputDataReceivers := h.outputDataReceivers,
+                  lastError := some (NearLogic.PanicUtf8Large.largeError h len.toNat limit),
+                  lastExecutionIssue := h.lastExecutionIssue,
+                  yieldCreateToken := h.yieldCreateToken, crypto := h.crypto,
+                  registerWrite := h.registerWrite, storageLog := h.storageLog,
+                  actionProfile := h.actionProfile }⌝ ∗
+          NearLogic.mhostPt h' ∗ ∃ R, NearLogic.credits Cg R)
+```
+
+## Bridge.Functions.PanicTotalCommon
+
+`WNear.Binary.PanicTotal.Spec817Total` (hash `a910fc408fb58746`)
+
+```lean
+def WNear.Binary.PanicTotal.Spec817Total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (Cg n g : ℕ)
+  (gt : Wasm.GlobalType) (sp p msg info loc : UInt32) (E : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState)
+  (bs : List UInt8) : Iris.IProp GF :=
+  fun bs =>
+    NearLogic.MFunSpecT cfg lim d WNear.Binary.types[0]! inst mi WNear.Binary.f817 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 p]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              n ↦[wms][ p.toNat ] WasmLogic.bytes32 msg ∗
+                n ↦[wms][ p.toNat + 4 ] WasmLogic.bytes32 info ∗
+                  n ↦[wms][ p.toNat + 8 ] WasmLogic.bytes32 loc ∗ E))
+      (fun x => K) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.Spec817Total_mono` (hash `00000000dec8f46d`)
+
+```lean
+theorem WNear.Binary.PanicTotal.Spec817Total_mono {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (Cg n g : ℕ)
+  (gt : Wasm.GlobalType) (sp p msg info loc : UInt32) (E E' : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState)
+  (bs : List UInt8) (hE : E ⊢ E') :
+  WNear.Binary.PanicTotal.Spec817Total cfg lim d inst mi Cg n g gt sp p msg info loc E' K h bs ⊢
+    WNear.Binary.PanicTotal.Spec817Total cfg lim d inst mi Cg n g gt sp p msg info loc E K h bs
+```
+
+`WNear.Binary.PanicTotal.f816_total` (hash `0000000086e2ab70`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f816_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ)
+  (gt : Wasm.GlobalType) (sp p msg info loc : UInt32) (hsp : 16 ≤ sp.toNat) (hp : p.toNat + 12 ≤ 2 ^ 32)
+  (E : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState) (bs : List UInt8) :
+  inst ↪[inst] mi ∗
+      A 817 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f817 ∗
+        WNear.Binary.PanicTotal.Spec817Total cfg lim (d + 1) inst mi Cg n g gt (sp - 16) (sp - 16) msg info loc E K h
+          bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f816 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 p]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              n ↦[wms][ p.toNat ] WasmLogic.bytes32 msg ∗
+                n ↦[wms][ p.toNat + 4 ] WasmLogic.bytes32 info ∗
+                  n ↦[wms][ p.toNat + 8 ] WasmLogic.bytes32 loc ∗
+                    WNear.Binary.VecFromElem.stk n (sp.toNat - 16) 16 ∗ E))
+      (fun x => 29 * cfg.regularOpCost + K) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.f817_fmt_total` (hash `000000000e39d7fb`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f817_fmt_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (e : ℕ) (A : ℕ → ℕ)
+  (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 10 < lim.maxCallDepth)
+  (Cg : ℕ) (gt : Wasm.GlobalType) (sp p a info loc msg plen alen lpc : UInt32)
+  (hb : plen = 1 ∧ alen ≠ 0 ∨ 2 ≤ plen.toNat) (S : ℕ) (hS : 32 ≤ S) (hsp : S + 80 ≤ sp.toNat) (hal : sp.toNat % 8 = 0)
+  (ha : a.toNat + 24 ≤ 2 ^ 32) (hp : p.toNat + 12 ≤ 2 ^ 32) (hinfo : info.toNat + 12 ≤ 2 ^ 32)
+  (Ga G' D0 : Iris.IProp GF) (Kg K : ℕ) (bs : List UInt8) (hpos : 0 < bs.length) (hlen : bs.length < 2 ^ 32)
+  (hutf : Wasm.Near.validUtf8 bs = true) (h : Wasm.NearState)
+  (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+  WNear.Binary.PanicFmt.code817 e inst mi A n mx ∗
+      A 826 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f826 ∗
+        WNear.Binary.PanicWithHook.GetSpec cfg lim (d + 2) inst mi Cg n g gt (sp - 16 - 32) (sp - 16) (sp - 16 + 4)
+            1066400 (S + 32) WNear.Binary.f826
+            iprop(WNear.Binary.PanicFmt.fmtPayload n (sp - 16) a ∗ WNear.Binary.PanicFmt.argsHead n a plen alen ∗ Ga) G'
+            Kg ∗
+          WNear.Binary.PanicHook.ToStr cfg lim (d + 4) inst mi Cg n g gt (sp - 16 - 32 - 32) (sp - 16 - 32 + 16) S
+            iprop(WNear.Binary.PanicWithHook.infoCells n (sp - 16 - 32 + 16) (sp - 16 + 4) 1066400 msg loc ∗
+                G' ∗ n ↦[wms][ info.toNat + 8 ] WasmLogic.bytes32 msg ∗ D0)
+            K bs ⊢
+    WNear.Binary.PanicTotal.Spec817Total cfg lim d inst mi Cg n g gt sp p a info loc
+      iprop(WNear.Binary.VecFromElem.stk n (sp.toNat - 80 - S) (S + 80) ∗
+          n ↦[wms][ info.toNat + 8 ] WasmLogic.bytes32 msg ∗
+            WNear.Binary.PanicFmt.argsHead n a plen alen ∗
+              Ga ∗ WNear.Binary.PanicFmt.envP n ta A lpc 1066360 179 (A 826) D0 h)
+      (WNear.Binary.PanicFmt.cost817 cfg WNear.Binary.f826 Kg K bs h) h bs
+```
+
+`WNear.Binary.PanicTotal.f823_total` (hash `00000000a9444a9c`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f823_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth) (Cg : ℕ)
+  (gt : Wasm.GlobalType) (sp info msg loc : UInt32) (hsp : 32 ≤ sp.toNat) (hinfo : info.toNat + 16 ≤ 2 ^ 32)
+  (hmsg : msg ≠ 0) (hloc : loc ≠ 0) (E : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState) (bs : List UInt8) :
+  inst ↪[inst] mi ∗
+      A 816 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f816 ∗
+        A 817 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f817 ∗
+          A 883 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f883 ∗
+            A 884 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f884 ∗
+              A 795 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f795 ∗
+                A 796 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f796 ∗
+                  WNear.Binary.PanicTotal.Spec817Total cfg lim (d + 2) inst mi Cg n g gt (sp - 16 - 16) (sp - 16 - 16)
+                    msg info loc iprop(n ↦[wms][ info.toNat + 8 ] WasmLogic.bytes32 msg ∗ E) K h bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f823 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 info]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              n ↦[wms][ info.toNat + 8 ] WasmLogic.bytes32 msg ∗
+                n ↦[wms][ info.toNat + 12 ] WasmLogic.bytes32 loc ∗
+                  WNear.Binary.VecFromElem.stk n (sp.toNat - 32) 32 ∗ E))
+      (fun x => 109 * cfg.regularOpCost + K) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.f824_total` (hash `000000007123dff4`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f824_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 9 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp p0 vt msg loc gidx : UInt32) (ag : ℕ)
+  (codeG : Wasm.Func) (pp pv lpc : UInt32) (S : ℕ) (hS : 32 ≤ S) (hsp : S + 64 ≤ sp.toNat) (hal : sp.toNat % 8 = 0)
+  (hvt : vt.toNat + 20 ≤ 2 ^ 32) (G G' D0 : Iris.IProp GF) (Kg K : ℕ) (bs : List UInt8) (hpos : 0 < bs.length)
+  (hlen : bs.length < 2 ^ 32) (hutf : Wasm.Near.validUtf8 bs = true) (h : Wasm.NearState)
+  (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+  ag ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst codeG ∗
+      WNear.Binary.PanicWithHook.GetSpec cfg lim (d + 1) inst mi Cg n g gt (sp - 32) p0 pp pv (S + 32) codeG G G' Kg ∗
+        A 473 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f473 ∗
+          A 474 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f474 ∗
+            WNear.Binary.PanicHook.hookCode e inst mi A n mx ∗
+              WNear.Binary.PanicHook.ToStr cfg lim (d + 3) inst mi Cg n g gt (sp - 32 - 32) (sp - 32 + 16) S
+                iprop(WNear.Binary.PanicWithHook.infoCells n (sp - 32 + 16) pp pv msg loc ∗ G' ∗ D0) K bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f824 Cg
+      (WNear.Binary.PanicWithHook.pre n g ta A gt sp p0 vt msg loc gidx ag lpc S G D0 h)
+      (fun x => WNear.Binary.PanicWithHook.cost824 cfg codeG Kg K bs h) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.f859_total` (hash `0000000082ed7daf`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f859_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 3 < lim.maxCallDepth) (Cg : ℕ)
+  (gt : Wasm.GlobalType) (sp a loc : UInt32) (hsp : 48 ≤ sp.toNat) (ha : a ≠ 0) (hloc : loc ≠ 0) (E : Iris.IProp GF)
+  (K : ℕ) (h : Wasm.NearState) (bs : List UInt8) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      WNear.Binary.PanicTotal.Spec817Total cfg lim (d + 3) inst mi Cg n g gt (sp - 16 - 16 - 16) (sp - 16 - 16 - 16) a
+        (sp - 16) loc iprop(n ↦[wms][ (sp - 16).toNat + 8 ] WasmLogic.bytes32 a ∗ E) K h bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f859 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 a, Wasm.Value.i32 loc]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗ WNear.Binary.VecFromElem.stk n (sp.toNat - 48) 48 ∗ E))
+      (fun x => 138 * cfg.regularOpCost + K) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.spec817_total_persistent` (hash `0000000082b36502`)
+
+```lean
+theorem WNear.Binary.PanicTotal.spec817_total_persistent {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (Cg n g : ℕ)
+  (gt : Wasm.GlobalType) (sp p msg info loc : UInt32) (E : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState)
+  (bs : List UInt8) :
+  Iris.BI.Persistent (WNear.Binary.PanicTotal.Spec817Total cfg lim d inst mi Cg n g gt sp p msg info loc E K h bs)
+```
+
+## Bridge.Functions.PanicTotalExpectError
+
+`WNear.Binary.PanicTotal.f881_total_full` (hash `00000000759b45c5`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f881_total_full {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 14 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp m l err vt loc lpc : UInt32) (hloc : loc ≠ 0)
+  (S : ℕ) (hS : 32 ≤ S) (hsp : S + 192 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (Ga G' D1 : Iris.IProp GF) (Kg K : ℕ)
+  (bs : List UInt8) (hpos : 0 < bs.length) (hlen : bs.length < 2 ^ 32) (hutf : Wasm.Near.validUtf8 bs = true)
+  (h : Wasm.NearState) (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        WNear.Binary.PanicFmt.code817 e inst mi A n mx ∗
+          A 826 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f826 ∗
+            WNear.Binary.PanicWithHook.GetSpec cfg lim (d + 6) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16 - 16 - 32)
+                (sp - 64 - 16 - 16 - 16 - 16) (sp - 64 - 16 - 16 - 16 - 16 + 4) 1066400 (S + 32) WNear.Binary.f826
+                iprop(WNear.Binary.PanicFmt.fmtPayload n (sp - 64 - 16 - 16 - 16 - 16) (sp - 64 + 24) ∗
+                    WNear.Binary.PanicFmt.argsHead n (sp - 64 + 24) 2 2 ∗
+                      WNear.Binary.PanicExpectError.expectErrArgs n (sp - 64) m l err vt ∗ Ga)
+                G' Kg ∗
+              WNear.Binary.PanicHook.ToStr cfg lim (d + 8) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16 - 16 - 32 - 32)
+                (sp - 64 - 16 - 16 - 16 - 16 - 32 + 16) S
+                iprop(WNear.Binary.PanicWithHook.infoCells n (sp - 64 - 16 - 16 - 16 - 16 - 32 + 16)
+                      (sp - 64 - 16 - 16 - 16 - 16 + 4) 1066400 (sp - 64 + 24) loc ∗
+                    G' ∗ n ↦[wms][ (sp - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (sp - 64 + 24) ∗ D1)
+                K bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f881 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 m, Wasm.Value.i32 l, Wasm.Value.i32 err, Wasm.Value.i32 vt, Wasm.Value.i32 loc]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 112) 112 ∗
+                WNear.Binary.VecFromElem.stk n ((sp - 64 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
+                  Ga ∗ WNear.Binary.PanicFmt.envP n ta A lpc 1066360 179 (A 826) D1 h))
+      (fun x => 250 * cfg.regularOpCost + WNear.Binary.PanicFmt.cost817 cfg WNear.Binary.f826 Kg K bs h)
+      (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.f881_total_spec` (hash `00000000691ab35b`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f881_total_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 4 < lim.maxCallDepth) (Cg : ℕ)
+  (gt : Wasm.GlobalType) (sp m l err vt loc : UInt32) (hsp : 112 ≤ sp.toNat) (hloc : loc ≠ 0) (E : Iris.IProp GF)
+  (K : ℕ) (h : Wasm.NearState) (bs : List UInt8) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        WNear.Binary.PanicTotal.Spec817Total cfg lim (d + 4) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16)
+          (sp - 64 - 16 - 16 - 16) (sp - 64 + 24) (sp - 64 - 16) loc
+          iprop(n ↦[wms][ (sp - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (sp - 64 + 24) ∗
+              WNear.Binary.PanicFmt.argsHead n (sp - 64 + 24) 2 2 ∗
+                WNear.Binary.PanicExpectError.expectErrArgs n (sp - 64) m l err vt ∗ E)
+          K h bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f881 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 m, Wasm.Value.i32 l, Wasm.Value.i32 err, Wasm.Value.i32 vt, Wasm.Value.i32 loc]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 112) 112 ∗ E))
+      (fun x => 250 * cfg.regularOpCost + K) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+## Bridge.Functions.PanicTotalHook
+
+`WNear.Binary.PanicTotal.cost474Large` (hash `11433002ac180529`)
+
+```lean
+def WNear.Binary.PanicTotal.cost474Large (cfg : Wasm.Near.WasmConfig) (K : ℕ) (h : Wasm.NearState) : ℕ :=
+  285 * cfg.regularOpCost + K + NearLogic.PanicUtf8Large.largeUse h
+```
+
+`WNear.Binary.PanicTotal.expectedError` (hash `6f255d60333e8998`)
+
+```lean
+def WNear.Binary.PanicTotal.expectedError (h : Wasm.NearState) (bs : List UInt8) : Wasm.Near.HostError :=
+  match h.config.maxLogLen with
+  | none => Wasm.Near.HostError.guestPanic (Wasm.Near.utf8String bs)
+  | some limit =>
+    if limit - (List.map List.length h.logs).sum < bs.length then
+      NearLogic.PanicUtf8Large.largeError h bs.length limit
+    else Wasm.Near.HostError.guestPanic (Wasm.Near.utf8String bs)
+```
+
+`WNear.Binary.PanicTotal.expectedError_no_issue` (hash `00000000b0c41566`)
+
+```lean
+theorem WNear.Binary.PanicTotal.expectedError_no_issue (h : Wasm.NearState) (bs : List UInt8) :
+  (Wasm.Near.FunctionCallError.hostError (WNear.Binary.PanicTotal.expectedError h bs)).issue? = none
+```
+
+`WNear.Binary.PanicTotal.expectedError_not_out_of_gas` (hash `000000002afd4c58`)
+
+```lean
+theorem WNear.Binary.PanicTotal.expectedError_not_out_of_gas (h : Wasm.NearState) (bs : List UInt8) :
+  (Wasm.Near.FunctionCallError.hostError (WNear.Binary.PanicTotal.expectedError h bs)).isOutOfGas = false
+```
+
+`WNear.Binary.PanicTotal.f473_total` (hash `00000000edb16024`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f473_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 7 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp self ip : UInt32) (S : ℕ) (hS : 32 ≤ S)
+  (hsp : S + 32 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (D : Iris.IProp GF) (K : ℕ) (bs : List UInt8)
+  (hpos : 0 < bs.length) (hlen : bs.length < 2 ^ 32) (hutf : Wasm.Near.validUtf8 bs = true) (h : Wasm.NearState)
+  (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+  A 474 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f474 ∗
+      WNear.Binary.PanicHook.hookCode e inst mi A n mx ∗
+        WNear.Binary.PanicHook.ToStr cfg lim (d + 2) inst mi Cg n g gt (sp - 32) ip S D K bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f473 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 self, Wasm.Value.i32 ip]⌝ ∗
+            WNear.Binary.PanicHook.hookPre n g ta A gt sp ip S D h [Wasm.Value.i32 ip]))
+      (fun x => 11 * cfg.regularOpCost + WNear.Binary.PanicHook.cost474 cfg K bs h) (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.f474_large` (hash `00000000cb65262f`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f474_large {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 6 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp ip : UInt32) (S : ℕ) (hS : 32 ≤ S)
+  (hsp : S + 32 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (D : Iris.IProp GF) (K : ℕ) (bs : List UInt8)
+  (hlen : bs.length < 2 ^ 32) (h : Wasm.NearState) (limit : ℕ) (hlimit : h.config.maxLogLen = some limit)
+  (hlarge : limit - (List.map List.length h.logs).sum < bs.length) :
+  WNear.Binary.PanicHook.hookCode e inst mi A n mx ∗
+      WNear.Binary.PanicHook.ToStr cfg lim (d + 1) inst mi Cg n g gt (sp - 32) ip S D K bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f474 Cg
+      (WNear.Binary.PanicHook.hookPre n g ta A gt sp ip S D h) (fun x => WNear.Binary.PanicTotal.cost474Large cfg K h)
+      (fun x x_1 => iprop(False)) fun x => WNear.Binary.PanicTotal.failedLarge Cg h (UInt64.ofNat bs.length) limit
+```
+
+`WNear.Binary.PanicTotal.f474_total` (hash `000000007f9f5745`)
+
+```lean
+theorem WNear.Binary.PanicTotal.f474_total {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 6 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp ip : UInt32) (S : ℕ) (hS : 32 ≤ S)
+  (hsp : S + 32 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (D : Iris.IProp GF) (K : ℕ) (bs : List UInt8)
+  (hpos : 0 < bs.length) (hlen : bs.length < 2 ^ 32) (hutf : Wasm.Near.validUtf8 bs = true) (h : Wasm.NearState)
+  (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+  WNear.Binary.PanicHook.hookCode e inst mi A n mx ∗
+      WNear.Binary.PanicHook.ToStr cfg lim (d + 1) inst mi Cg n g gt (sp - 32) ip S D K bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f474 Cg
+      (WNear.Binary.PanicHook.hookPre n g ta A gt sp ip S D h) (fun x => WNear.Binary.PanicHook.cost474 cfg K bs h)
+      (fun x x_1 => iprop(False)) fun x =>
+      WNear.Binary.PanicTotal.failedWith Cg h (WNear.Binary.PanicTotal.expectedError h bs)
+```
+
+`WNear.Binary.PanicTotal.failedWith` (hash `d5dd7b596267fe0c`)
+
+```lean
+def WNear.Binary.PanicTotal.failedWith {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (Cg : ℕ)
+  (h : Wasm.NearState) (error : Wasm.Near.HostError) : Iris.IProp GF :=
+  fun error =>
+    iprop(∃ h',
+        ⌜NearLogic.erase h' =
+              NearLogic.erase
+                { storage := h.storage, storageAccounting := h.storageAccounting,
+                  storageProofSize := h.storageProofSize,
+                  storageReadsFromTrie := h.storageReadsFromTrie, storageKeys := h.storageKeys,
+                  iterators := h.iterators, nextIteratorId := h.nextIteratorId,
+                  registers := h.registers, context := h.context,
+                  subsidizedAmount := h.subsidizedAmount, returnData := h.returnData,
+                  logs := h.logs, promiseResults := h.promiseResults, promises := h.promises,
+                  gasWeights := h.gasWeights, returnedPromise := h.returnedPromise,
+                  yieldResumes := h.yieldResumes, actionHash := h.actionHash,
+                  existingYields := h.existingYields, config := h.config,
+                  randomSeed := h.randomSeed, gas := h.gas, gasProfile := h.gasProfile,
+                  extCosts := h.extCosts, fees := h.fees,
+                  outputDataReceivers := h.outputDataReceivers, lastError := some error,
+                  lastExecutionIssue := h.lastExecutionIssue,
+                  yieldCreateToken := h.yieldCreateToken, crypto := h.crypto,
+                  registerWrite := h.registerWrite, storageLog := h.storageLog,
+                  actionProfile := h.actionProfile }⌝ ∗
+          NearLogic.mhostPt h' ∗ ∃ R, NearLogic.credits Cg R)
+```
+
+`WNear.Binary.PanicTotal.largeUse_le` (hash `00000000eef85713`)
+
+```lean
+theorem WNear.Binary.PanicTotal.largeUse_le (h : Wasm.NearState) (n : ℕ) :
+  NearLogic.PanicUtf8Large.largeUse h ≤ NearLogic.panicUtf8Use h n
+```
+
+`WNear.Binary.PanicTotal.nilBytes` (hash `0000000015dcfd18`)
+
+```lean
+theorem WNear.Binary.PanicTotal.nilBytes {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (n ptr : ℕ) :
+  ⊢ n ↦[wms][ ptr ] []
+```
+
+`WNear.Binary.PanicTotal.trap_cost_mono` (hash `00000000c9932fe0`)
+
+```lean
+theorem WNear.Binary.PanicTotal.trap_cost_mono {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (code : Wasm.Func) (Cg : ℕ) (P : List Wasm.Value → Iris.IProp GF) (K0 K1 : List Wasm.Value → ℕ)
+  (Q : List Wasm.Value → List Wasm.Value → Iris.IProp GF) (T : List Wasm.Value → Iris.IProp GF)
+  (hK : ∀ (args : List Wasm.Value), K0 args ≤ K1 args) :
+  NearLogic.MFunSpecT cfg lim d type inst mi code Cg P K0 Q T ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi code Cg P K1 Q T
 ```
 
 ## Bridge.Functions.ReadRegister
@@ -27462,6 +28040,77 @@ theorem WNear.Binary.InputDomain.wf_arguments_small (ctx : NearInterface.Context
   (hl : WNear.Binary.InputDomain.ArgumentLimitV86 ctx.protocol) : List.length ctx.args ≤ 4194304
 ```
 
+## Bridge.Methods.BalanceOfRejectedObservation
+
+`WNear.Binary.PanicTotal.balance_rejected_receipt_no_issue` (hash `000000001f4689f7`)
+
+```lean
+theorem WNear.Binary.PanicTotal.balance_rejected_receipt_no_issue (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (raw : WNear.RawStorage) (ctx : NearInterface.Context) (Pre : Wasm.NearState → Prop) (cost : Wasm.NearState → ℕ)
+  (bs : List UInt8) (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw) (hm : ctx.method = "ft_balance_of")
+  (hspec :
+    WNear.Binary.RecordedFailure.RecordedFailureRun ctx.protocol 297 Pre cost
+      (WNear.Binary.PanicTotal.rejectedReceiptPost bs))
+  (hpreP : Pre (NearLogic.eraseP (WNear.Binary.hostOf ctx raw))) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  NearInterface.RolledBack ctx raw r ∧
+    ∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.Binary.PanicTotal.rejectedPanicPost` (hash `9fd1ed4f1ac7789b`)
+
+```lean
+def WNear.Binary.PanicTotal.rejectedPanicPost (bs : List UInt8) (h e : Wasm.NearState) : Prop :=
+  e =
+    NearLogic.erase
+      { storage := h.storage, storageAccounting := h.storageAccounting,
+        storageProofSize := h.storageProofSize, storageReadsFromTrie := h.storageReadsFromTrie,
+        storageKeys := h.storageKeys, iterators := h.iterators,
+        nextIteratorId := h.nextIteratorId, registers := h.registers, context := h.context,
+        subsidizedAmount := h.subsidizedAmount, returnData := h.returnData, logs := h.logs,
+        promiseResults := h.promiseResults, promises := h.promises, gasWeights := h.gasWeights,
+        returnedPromise := h.returnedPromise, yieldResumes := h.yieldResumes,
+        actionHash := h.actionHash, existingYields := h.existingYields, config := h.config,
+        randomSeed := h.randomSeed, gas := h.gas, gasProfile := h.gasProfile,
+        extCosts := h.extCosts, fees := h.fees, outputDataReceivers := h.outputDataReceivers,
+        lastError := some (WNear.Binary.PanicTotal.expectedError h bs),
+        lastExecutionIssue := h.lastExecutionIssue, yieldCreateToken := h.yieldCreateToken,
+        crypto := h.crypto, registerWrite := h.registerWrite, storageLog := h.storageLog,
+        actionProfile := h.actionProfile }
+```
+
+`WNear.Binary.PanicTotal.rejectedPanicPost_receipt` (hash `00000000aec514cd`)
+
+```lean
+theorem WNear.Binary.PanicTotal.rejectedPanicPost_receipt (bs : List UInt8) (h e : Wasm.NearState)
+  (he : WNear.Binary.PanicTotal.rejectedPanicPost bs h e) (hi : h.lastExecutionIssue = none) :
+  WNear.Binary.PanicTotal.rejectedReceiptPost bs h e
+```
+
+`WNear.Binary.PanicTotal.rejectedReceiptPost` (hash `6b17fdbcae706cdb`)
+
+```lean
+def WNear.Binary.PanicTotal.rejectedReceiptPost (bs : List UInt8) (h e : Wasm.NearState) : Prop :=
+  e.lastError = some (WNear.Binary.PanicTotal.expectedError h bs) ∧ e.lastExecutionIssue = none
+```
+
+`WNear.Binary.PanicTotal.rejected_receipt_no_issue` (hash `000000007d73939a`)
+
+```lean
+theorem WNear.Binary.PanicTotal.rejected_receipt_no_issue (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (raw : WNear.RawStorage) (ctx : NearInterface.Context) {i : ℕ} (Pre : Wasm.NearState → Prop)
+  (cost : Wasm.NearState → ℕ) (bs : List UInt8) (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw)
+  (hname : ctx.method.isEmpty = false) (hexp : WNear.Binary.wNearModule.exportFunc? ctx.method = some i)
+  (hft : WNear.Binary.wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
+  (hspec :
+    WNear.Binary.RecordedFailure.RecordedFailureRun ctx.protocol i Pre cost
+      (WNear.Binary.PanicTotal.rejectedReceiptPost bs))
+  (hpreP : Pre (NearLogic.eraseP (WNear.Binary.hostOf ctx raw))) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  NearInterface.RolledBack ctx raw r ∧
+    ∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)
+```
+
 ## Bridge.Methods.Code297
 
 `WNear.Binary.BalanceOf297AbsentCall.code297` (hash `528cbfa333678ad7`)
@@ -32488,6 +33137,154 @@ theorem WNear.Binary.SerdeObjectPrefix.weighted_linear_bundled_refines_init (cfg
         NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
 ```
 
+## Bridge.Methods.RecordedFailure
+
+`WNear.Binary.RecordedFailure.FailureHost` (hash `e732477878ffe9a1`)
+
+```lean
+def WNear.Binary.RecordedFailure.FailureHost (error : Wasm.Near.HostError) (e : Wasm.NearState) : Prop :=
+  e.lastError = some error ∧ e.lastExecutionIssue = none
+```
+
+`WNear.Binary.RecordedFailure.FailureOutcome` (hash `785b6df00219cd8c`)
+
+```lean
+def WNear.Binary.RecordedFailure.FailureOutcome (o : Wasm.Near.VMOutcome) (error : Wasm.Near.HostError)
+  (e : Wasm.NearState) : Prop :=
+  o.aborted = some (Wasm.Near.FunctionCallError.hostError error) ∧
+    o.returnData = Wasm.Near.ReturnData.none ∧ o.receipts = [] ∧ o.logs = Wasm.Near.logsOf e
+```
+
+`WNear.Binary.RecordedFailure.RecordedFailureRun` (hash `573ae2ab5cb5c35a`)
+
+```lean
+def WNear.Binary.RecordedFailure.RecordedFailureRun (cfg : Wasm.Near.RuntimeConfig) (i : ℕ) (Pre : Wasm.NearState → Prop)
+  (cost : Wasm.NearState → ℕ) (Post : Wasm.NearState → Wasm.NearState → Prop) : Prop :=
+  WNear.Binary.MethodPanicsR cfg i Pre cost Post
+```
+
+`WNear.Binary.RecordedFailure.method_boundary_no_issue` (hash `0000000008862c97`)
+
+```lean
+theorem WNear.Binary.RecordedFailure.method_boundary_no_issue (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (raw : NearInterface.RawStorage) (ctx : NearInterface.Context) {i : ℕ} (Pre : Wasm.NearState → Prop)
+  (cost : Wasm.NearState → ℕ) (Post : Wasm.NearState → Wasm.NearState → Prop) (error : Wasm.Near.HostError)
+  (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw) (hname : ctx.method.isEmpty = false)
+  (hexp : WNear.Binary.wNearModule.exportFunc? ctx.method = some i)
+  (hft : WNear.Binary.wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
+  (hspec : WNear.Binary.RecordedFailure.RecordedFailureRun ctx.protocol i Pre cost Post)
+  (hpreP : Pre (NearLogic.eraseP (WNear.Binary.hostOf ctx raw)))
+  (hendP :
+    ∀ (e : Wasm.NearState),
+      Post (NearLogic.eraseP (WNear.Binary.hostOf ctx raw)) e → WNear.Binary.RecordedFailure.FailureHost error e)
+  (hi : (Wasm.Near.FunctionCallError.hostError error).issue? = none) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  NearInterface.RolledBack ctx raw r ∧
+    ∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.Binary.RecordedFailure.method_vmOutcomeFailure` (hash `000000009705765d`)
+
+```lean
+theorem WNear.Binary.RecordedFailure.method_vmOutcomeFailure (cfg : Wasm.Near.RuntimeConfig) (size : ℕ) (method : String)
+  (ctx : Wasm.Near.VMContext) (storage : List (List UInt8 × List UInt8)) {i : ℕ} (Pre : Wasm.NearState → Prop)
+  (cost : Wasm.NearState → ℕ) (Post : Wasm.NearState → Wasm.NearState → Prop) (error : Wasm.Near.HostError) (Cg : ℕ)
+  (hpos : 0 < Wasm.Near.minOpCost cfg.wasm)
+  (hlimit : Wasm.Near.prepareLimitError cfg.wasm.limits WNear.Binary.wNearModule = none)
+  (hmin : cfg.wasm.limits.initialMemoryPages = 1024) (hmax : cfg.wasm.limits.maxMemoryPages = 2048)
+  (hname : method.isEmpty = false) (hexp : WNear.Binary.wNearModule.exportFunc? method = some i)
+  (hft : WNear.Binary.wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
+  (hspec : WNear.Binary.RecordedFailure.RecordedFailureRun cfg i Pre cost Post)
+  (hpre : Pre (NearLogic.erase (Wasm.Near.VMContext.toNearState cfg ctx storage)))
+  (hend :
+    ∀ (e : Wasm.NearState),
+      Post (NearLogic.erase (Wasm.Near.VMContext.toNearState cfg ctx storage)) e →
+        WNear.Binary.RecordedFailure.FailureHost error e)
+  (hgas :
+    (Wasm.Near.VMContext.toNearState cfg ctx storage).gas.used +
+          NearLogic.chargesUse (Wasm.Near.VMContext.toNearState cfg ctx storage) (Wasm.Near.loadingCharges size) +
+        cost (NearLogic.erase (Wasm.Near.VMContext.toNearState cfg ctx storage)) ≤
+      Cg)
+  (hC1 : Cg ≤ (Wasm.Near.VMContext.toNearState cfg ctx storage).gas.maxBurnt)
+  (hC2 : Cg ≤ (Wasm.Near.VMContext.toNearState cfg ctx storage).gas.prepaid) :
+  have o := Wasm.Near.run cfg WNear.Binary.wNearModule size method ctx storage;
+  ∃ e,
+    Post (NearLogic.erase (Wasm.Near.VMContext.toNearState cfg ctx storage)) e ∧
+      WNear.Binary.RecordedFailure.FailureOutcome o error e ∧ o.burntGas ≤ Cg
+```
+
+`WNear.Binary.RecordedFailure.method_vm_anyFailure` (hash `000000009d58c181`)
+
+```lean
+theorem WNear.Binary.RecordedFailure.method_vm_anyFailure (cfg : Wasm.Near.RuntimeConfig) (size : ℕ) (method : String)
+  (ctx : Wasm.Near.VMContext) (storage : List (List UInt8 × List UInt8)) {i : ℕ} (Pre : Wasm.NearState → Prop)
+  (cost : Wasm.NearState → ℕ) (Post : Wasm.NearState → Wasm.NearState → Prop) (error : Wasm.Near.HostError)
+  (hpos : 0 < Wasm.Near.minOpCost cfg.wasm)
+  (hlimit : Wasm.Near.prepareLimitError cfg.wasm.limits WNear.Binary.wNearModule = none)
+  (hmin : cfg.wasm.limits.initialMemoryPages = 1024) (hmax : cfg.wasm.limits.maxMemoryPages = 2048)
+  (hname : method.isEmpty = false) (hexp : WNear.Binary.wNearModule.exportFunc? method = some i)
+  (hft : WNear.Binary.wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
+  (hspec : WNear.Binary.RecordedFailure.RecordedFailureRun cfg i Pre cost Post)
+  (hpre : Pre (NearLogic.eraseP (Wasm.Near.VMContext.toNearState cfg ctx storage)))
+  (hend :
+    ∀ (e : Wasm.NearState),
+      Post (NearLogic.eraseP (Wasm.Near.VMContext.toNearState cfg ctx storage)) e →
+        WNear.Binary.RecordedFailure.FailureHost error e) :
+  have o := Wasm.Near.run cfg WNear.Binary.wNearModule size method ctx storage;
+  ∃ e,
+    Post (NearLogic.eraseP (Wasm.Near.VMContext.toNearState cfg ctx storage)) e ∧
+      (WNear.Binary.GasFailureUpTo o (Wasm.Near.logsOf e) ∨ WNear.Binary.RecordedFailure.FailureOutcome o error e)
+```
+
+`WNear.Binary.RecordedFailure.observe_failure` (hash `00000000973f3ca8`)
+
+```lean
+theorem WNear.Binary.RecordedFailure.observe_failure (ctx : NearInterface.Context) (raw : NearInterface.RawStorage)
+  (codeOf : List UInt8 → Near.ContractCode) (o : Wasm.Near.VMOutcome) (error : Wasm.Near.HostError) (e : Wasm.NearState)
+  (ho : WNear.Binary.RecordedFailure.FailureOutcome o error e)
+  (hi : (Wasm.Near.FunctionCallError.hostError error).issue? = none) :
+  have r := WNear.Binary.observeW ctx raw codeOf o;
+  r.outcome = Except.error (Near.Boundary.failureOf (Wasm.Near.FunctionCallError.hostError error)) ∧
+    NearInterface.RolledBack ctx raw r ∧
+      r.logs = Wasm.Near.logsOf e ∧
+        ∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.Binary.RecordedFailure.outcome_failure` (hash `000000004b4e3f65`)
+
+```lean
+theorem WNear.Binary.RecordedFailure.outcome_failure (ctx : Wasm.Near.VMContext) (storage : List (List UInt8 × List UInt8))
+  (r : Wasm.Trap) (s : Wasm.Store Wasm.NearState) {error : Wasm.Near.HostError}
+  (hp : WNear.Binary.RecordedFailure.FailureHost error (NearLogic.erase s.host)) :
+  have o :=
+    Wasm.Near.VMOutcome.checkReceipts ctx.accountBalance ctx.storageUsage storage
+      (Wasm.Near.outcomeOfExecution ctx storage (Wasm.StepResult.trap r s) none);
+  WNear.Binary.RecordedFailure.FailureOutcome o error s.host ∧ o.burntGas = s.host.gas.burnt
+```
+
+## Bridge.Methods.RejectedRunPlan
+
+`WNear.Binary.PanicTotal.RejectedRunPlan` (hash `b96cfaa493cb1119`)
+
+```lean
+def WNear.Binary.PanicTotal.RejectedRunPlan (raw : WNear.RawStorage) (ctx : NearInterface.Context) : Prop :=
+  ∃ Pre cost bs,
+    WNear.Binary.RecordedFailure.RecordedFailureRun ctx.protocol 297 Pre cost
+        (WNear.Binary.PanicTotal.rejectedReceiptPost bs) ∧
+      Pre (NearLogic.eraseP (WNear.Binary.hostOf ctx raw))
+```
+
+`WNear.Binary.PanicTotal.rejected_receipt_of_plan` (hash `00000000d33c16eb`)
+
+```lean
+theorem WNear.Binary.PanicTotal.rejected_receipt_of_plan (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (raw : WNear.RawStorage) (ctx : NearInterface.Context) (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw)
+  (hm : ctx.method = "ft_balance_of") (plan : WNear.Binary.PanicTotal.RejectedRunPlan raw ctx) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  NearInterface.RolledBack ctx raw r ∧
+    ∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)
+```
+
 ## Bridge.Methods.Statics297
 
 `WNear.Binary.InitialState.frame297` (hash `637e958867d03070`)
@@ -33188,6 +33985,132 @@ def NearInterface.RolledBack (ctx : NearInterface.Context) (raw : NearInterface.
       r.balance = ctx.balance ∧ r.storageUsage = ctx.storageUsage ∧ r.receipts = []
 ```
 
+## NearLogic.Hosts.PanicUtf8Large
+
+`NearLogic.PanicUtf8Large.chargesBefore_large` (hash `00000000c6eec976`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.chargesBefore_large (st : Wasm.HostStore Wasm.NearState) (len ptr : UInt64) (limit : ℕ)
+  (hlen : len ≠ Wasm.u64Max) (hlimit : st.host.config.maxLogLen = some limit)
+  (hlarge : limit - (List.map List.length st.host.logs).sum < len.toNat) :
+  Wasm.Near.chargesBefore "panic_utf8" st [Wasm.Value.i64 len, Wasm.Value.i64 ptr] =
+    NearLogic.PanicUtf8Large.largeCharges
+```
+
+`NearLogic.PanicUtf8Large.largeCharges` (hash `ea67a4d8cbb6cdce`)
+
+```lean
+def NearLogic.PanicUtf8Large.largeCharges : List Wasm.Near.Charge :=
+  [Wasm.Near.Charge.ext "base", Wasm.Near.Charge.ext "utf8_decoding_base"]
+```
+
+`NearLogic.PanicUtf8Large.largeError` (hash `9d0a35e115867735`)
+
+```lean
+def NearLogic.PanicUtf8Large.largeError (h : Wasm.NearState) (n limit : ℕ) : Wasm.Near.HostError :=
+  Wasm.Near.HostError.totalLogLengthExceeded
+    (min ((List.map List.length h.logs).sum + n) (2 ^ 64 - 1)) limit
+```
+
+`NearLogic.PanicUtf8Large.largeError_no_issue` (hash `000000009e596fbd`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.largeError_no_issue (h : Wasm.NearState) (n limit : ℕ) :
+  (Wasm.Near.FunctionCallError.hostError (NearLogic.PanicUtf8Large.largeError h n limit)).issue? = none
+```
+
+`NearLogic.PanicUtf8Large.largeError_not_out_of_gas` (hash `00000000212d8ec4`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.largeError_not_out_of_gas (h : Wasm.NearState) (n limit : ℕ) :
+  (Wasm.Near.FunctionCallError.hostError (NearLogic.PanicUtf8Large.largeError h n limit)).isOutOfGas = false
+```
+
+`NearLogic.PanicUtf8Large.largeUse` (hash `8b706f48231ee769`)
+
+```lean
+def NearLogic.PanicUtf8Large.largeUse (h : Wasm.NearState) : ℕ :=
+  NearLogic.chargesUse h NearLogic.PanicUtf8Large.largeCharges
+```
+
+`NearLogic.PanicUtf8Large.log_length_cases` (hash `00000000c7cfdf15`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.log_length_cases (h : Wasm.NearState) (n : ℕ) (hn : 0 < n) :
+  NearLogic.LogFits h n ∨ ∃ limit, h.config.maxLogLen = some limit ∧ limit - (List.map List.length h.logs).sum < n
+```
+
+`NearLogic.PanicUtf8Large.panicUtf8Read_large` (hash `0000000052412d9a`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.panicUtf8Read_large (st : Wasm.HostStore Wasm.NearState) (len ptr : UInt64) (limit : ℕ)
+  (hlen : len ≠ Wasm.u64Max) (hlimit : st.host.config.maxLogLen = some limit)
+  (hlarge : limit - (List.map List.length st.host.logs).sum < len.toNat) :
+  Wasm.Near.panicUtf8Read st len ptr =
+    { charges := [Wasm.Near.ext1 "base", Wasm.Near.ext1 "utf8_decoding_base"],
+      result := Except.error (Wasm.Near.totalLogLengthExceeded st len.toNat) }
+```
+
+`NearLogic.PanicUtf8Large.panicUtf8_large` (hash `0000000077f77ef5`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.panicUtf8_large (extra : ℕ) (st : Wasm.HostStore Wasm.NearState) (len ptr : UInt64) (limit : ℕ)
+  {C : ℕ} (hlen : len ≠ Wasm.u64Max) (hlimit : st.host.config.maxLogLen = some limit)
+  (hlarge : limit - (List.map List.length st.host.logs).sum < len.toNat)
+  (h1 : st.host.gas.used + NearLogic.PanicUtf8Large.largeUse st.host ≤ C) (h2 : C ≤ st.host.gas.maxBurnt)
+  (h3 : C ≤ st.host.gas.prepaid) :
+  ∃ host',
+    (Wasm.Near.metered extra "panic_utf8" Wasm.Near.panicUtf8Metered).invoke st
+          [Wasm.Value.i64 len, Wasm.Value.i64 ptr] =
+        Wasm.HostResult.Trap { mem := st.mem, host := host' } (Wasm.Near.totalLogLengthExceeded st len.toNat).message ∧
+      NearLogic.erase host' =
+          NearLogic.erase
+            (have __src := st.host;
+            { storage := __src.storage, storageAccounting := __src.storageAccounting,
+              storageProofSize := __src.storageProofSize, storageReadsFromTrie := __src.storageReadsFromTrie,
+              storageKeys := __src.storageKeys, iterators := __src.iterators, nextIteratorId := __src.nextIteratorId,
+              registers := __src.registers, context := __src.context, subsidizedAmount := __src.subsidizedAmount,
+              returnData := __src.returnData, logs := __src.logs, promiseResults := __src.promiseResults,
+              promises := __src.promises, gasWeights := __src.gasWeights, returnedPromise := __src.returnedPromise,
+              yieldResumes := __src.yieldResumes, actionHash := __src.actionHash,
+              existingYields := __src.existingYields, config := __src.config, randomSeed := __src.randomSeed,
+              gas := __src.gas, gasProfile := __src.gasProfile, extCosts := __src.extCosts, fees := __src.fees,
+              outputDataReceivers := __src.outputDataReceivers,
+              lastError := some (Wasm.Near.totalLogLengthExceeded st len.toNat),
+              lastExecutionIssue := __src.lastExecutionIssue, yieldCreateToken := __src.yieldCreateToken,
+              crypto := __src.crypto, registerWrite := __src.registerWrite, storageLog := __src.storageLog,
+              actionProfile := __src.actionProfile }) ∧
+        host'.gas.used = st.host.gas.used + NearLogic.PanicUtf8Large.largeUse st.host ∧
+          host'.gas.maxBurnt = st.host.gas.maxBurnt ∧ host'.gas.prepaid = st.host.gas.prepaid
+```
+
+`NearLogic.PanicUtf8Large.panicUtf8_large_contract` (hash `00000000e2132f53`)
+
+```lean
+theorem NearLogic.PanicUtf8Large.panicUtf8_large_contract (extra : ℕ) (h : Wasm.NearState) (len ptr : UInt64) (limit : ℕ)
+  {C : ℕ} (hlen : len ≠ Wasm.u64Max) (hlimit : h.config.maxLogLen = some limit)
+  (hlarge : limit - (List.map List.length h.logs).sum < len.toNat) :
+  NearLogic.TrapContractP (Wasm.Near.metered extra "panic_utf8" Wasm.Near.panicUtf8Metered).toHostFn h
+    (fun h' =>
+      NearLogic.erase h' =
+        NearLogic.erase
+          { storage := h.storage, storageAccounting := h.storageAccounting, storageProofSize := h.storageProofSize,
+            storageReadsFromTrie := h.storageReadsFromTrie, storageKeys := h.storageKeys, iterators := h.iterators,
+            nextIteratorId := h.nextIteratorId, registers := h.registers, context := h.context,
+            subsidizedAmount := h.subsidizedAmount, returnData := h.returnData, logs := h.logs,
+            promiseResults := h.promiseResults, promises := h.promises, gasWeights := h.gasWeights,
+            returnedPromise := h.returnedPromise, yieldResumes := h.yieldResumes, actionHash := h.actionHash,
+            existingYields := h.existingYields, config := h.config, randomSeed := h.randomSeed, gas := h.gas,
+            gasProfile := h.gasProfile, extCosts := h.extCosts, fees := h.fees,
+            outputDataReceivers := h.outputDataReceivers,
+            lastError := some (NearLogic.PanicUtf8Large.largeError h len.toNat limit),
+            lastExecutionIssue := h.lastExecutionIssue, yieldCreateToken := h.yieldCreateToken, crypto := h.crypto,
+            registerWrite := h.registerWrite, storageLog := h.storageLog, actionProfile := h.actionProfile })
+    [Wasm.Value.i64 len, Wasm.Value.i64 ptr]
+    (Wasm.Trap.host (NearLogic.PanicUtf8Large.largeError h len.toNat limit).message) ptr.toNat []
+    (NearLogic.PanicUtf8Large.largeUse h) C
+```
+
 ## NearRuntime.ActionValidation
 
 `Near.validateActionOrder_member` (hash `0000000061746082`)
@@ -33420,6 +34343,19 @@ theorem WNear.ftBalanceOf_initialized_rejected_no_issue_obligation (cfg : WNear.
     Except.error (NearInterface.Failure.executionIssue msg)
 ```
 
+`WNear.ftBalanceOf_initialized_rejected_run_obligation` (hash `00000000a7f03998`)
+
+```lean
+theorem WNear.ftBalanceOf_initialized_rejected_run_obligation (cfg : WNear.Config) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage) (S : WNear.State)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hreject : ¬∃ a, (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a)) :
+  WNear.Binary.PanicTotal.RejectedRunPlan raw ctx
+```
+
 `WNear.ftBalanceOf_no_issue_obligation` (hash `00000000285557a9`)
 
 ```lean
@@ -33645,6 +34581,19 @@ theorem WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation (cfg : WNea
   (hreject : ¬∃ a, (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a)) (msg : String) :
   (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx).outcome ≠
     Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.ftBalanceOf_uninitialized_rejected_run_obligation` (hash `00000000a0a634fd`)
+
+```lean
+theorem WNear.ftBalanceOf_uninitialized_rejected_run_obligation (cfg : WNear.Config) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw none) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hreject : ¬∃ a, (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a)) :
+  WNear.Binary.PanicTotal.RejectedRunPlan raw ctx
 ```
 
 `WNear.ftResolveTransfer_obligation` (hash `000000009b74f93c`)

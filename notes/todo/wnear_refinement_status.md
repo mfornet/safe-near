@@ -33,6 +33,75 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: both panic-size branches and receipt safety composition
+
+The actual oversized explicit-length panic_utf8 reader, metering and exact
+TrapContractP are now proved in NearLogic without any new admission allowance.
+The branch checks the configured remaining log capacity before reading memory or
+decoding UTF8. It preserves memory and erased host state except the exact
+lastError, charges only base and utf8_decoding_base, and retains gas ceilings.
+Its actual error is totalLogLengthExceeded, with neither an execution issue nor
+out-of-gas classification. No nonempty message-memory ownership is invented.
+
+The installed interface, RefCell dispatch and env::panic_str reach that host rule.
+The real SDK hook now composes fitting and oversized messages with exact selected
+host errors and the unchanged original cost upper bound. This removes a universal
+LogFits premise while retaining original byte-length, UTF8 and cost-overflow
+requirements where the fitting reader needs them. Callback, rust panic_with_hook,
+formatted common entry 817 and actual wrappers 816/823/859/881 compose this result.
+GetSpec and ToStr remain named verification inputs. The old interfaces and all
+old theorem statements are unchanged.
+
+The actual rejected ft_balance_of handoff constructs its common panic entry from
+GetSpec and ToStr. It preserves actual tag/error/output cells, deep stack,
+environment, location, exact host error and the original 300-operation overhead.
+The whole common panic specification is no longer an input on this constructed
+route. The generic Spec817Total family still remains Open.
+
+A checked receipt composition also carries an exact recorded host failure through
+loading, fuel, gas/proof relaxation and the full-context runtime observation. It
+retains exact failureOf, logs and rollback, and excludes execution issues using
+explicit concrete error classification. Its named RecordedFailureRun contract is
+an exact wrapper of the original complete MethodPanicsR obligation. That run
+remains Open, so dependent VM and receipt compositions are Conditional; no actual
+rejected receipt has been declared complete. Gas/proof erasure preserves the
+selected panic error and exact trap posts supply the final host fields.
+
+The actual function-297 export/type now instantiates this receipt composition
+with the checked two-branch host-error classification and gas/proof erasure
+invariance. The final-host relation records the exact error fields while allowing
+actual input/storage reads to change registers. This full-context caller still
+requires the exact complete RecordedFailureRun and reachable precondition; the
+rejected-input safety callers remain Conditional until their exact run plans are proved.
+
+Parser-produced owned error payloads, concrete Get/ToStr, outer String escaping,
+full UInt32 formatting, uniform-before-Cg cost, complete rejected method runs,
+remaining methods and protocol premises still require proof. IgnoreHyp,
+KeyConditions and ValueConditions remain unresolved dependencies. No deployed
+input, binary, receipt domain, model gas, observation or rollback statement is
+weakened. Global end-to-end correctness still requires all obligations and a clean
+no-sorryAx audit.
+
+Two original rejected-input safety admissions now use checked receipt-plan
+composition without changing either statement or its represented-state, protocol,
+runtime, method, input, gas or observation premises. Their precise remaining
+actual-function-297 run plans are separate named admissions for initialized and
+uninitialized storage. Both run leaves stay Open, both original safety callers
+stay Conditional through sorryAx, and the global refinement remains incomplete.
+The exact direct frontier replaces only those two safety leaves with the two run
+leaves; the transitive incomplete frontier adds the two new declarations. The
+strict allowance remains Proofs.Refinement only, with no infrastructure exception.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T21:58:28+00:00 for proof source `787dc39c940c7f49f8143a905a2eaf5f43a86aff9302d3184b2ecbf80073de48`. All 182 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin and
+shape is unchanged. Only the two original rejected safety leaves change from
+Open admissions to Conditional composition. The exact direct frontier replaces
+those two names with two precise run leaves, and the exact transitive frontier
+adds those two new declarations. The strict module allowance is unchanged. NearLogic passes with no axiom
+violations. Named Get/ToStr, common-entry and complete-method-run contracts remain
+visible and unresolved. Live publication must match this evidence.
+
 ## Continuation on 2026-10-31: first writer is constructed through the whole Debug path
 
 Actual function 872 now composes its deployed empty first piece with the static
