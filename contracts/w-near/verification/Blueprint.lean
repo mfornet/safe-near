@@ -1394,7 +1394,7 @@ attribute [blueprint "frontier:object-input-setup-through-cleanup"
 
 attribute [blueprint "frontier:object-absent-body"
   (title := /-- Whole object absent-account method body -/)
-  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)
+  (statement := /-- Checked specialization of the shared whole-body composition using the concrete object parser family and actual retained code resources. Original statement, depth bound, gas, memory and host premises are preserved; the uniform parser family is instantiated, while RegOk remains explicit until initial-resource composition. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.object_absent_body
 
@@ -1474,3 +1474,45 @@ attribute [blueprint "frontier:balance-outside-array-object-accepted"
   (statement := /-- Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation
+
+attribute [blueprint "frontier:parser-family"
+  (title := /-- Uniform parser provider at actual balance call sites -/)
+  (statement := /-- Exact successful-parser family: all credit budgets, call depths with 45 levels reserved, aligned stack pointers with 448 bytes, output/input pointers and initial-or-grown input heap states. Retains key/identifier bytes and declares parser gas and returned free-list bound. This interface is Open in general; it does not assert every accepted input satisfies it. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.ParserFamily
+
+attribute [blueprint "frontier:provider-deref-through-cleanup"
+  (title := /-- Parser provider through input dereference -/)
+  (statement := /-- Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:provider-expect-through-cleanup"
+  (title := /-- Parser provider through option unwrap -/)
+  (statement := /-- Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_expect_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:provider-input-through-cleanup"
+  (title := /-- Parser provider through actual input allocation -/)
+  (statement := /-- Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_input_parser_through_cleanup
+
+attribute [blueprint "frontier:provider-input-setup-through-cleanup"
+  (title := /-- Parser provider through input setup -/)
+  (statement := /-- Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_input_setup_through_cleanup
+
+attribute [blueprint "frontier:provider-absent-body"
+  (title := /-- Whole absent-account body from a parser provider -/)
+  (statement := /-- Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_absent_body
+
+attribute [blueprint "frontier:object-parser-family-instance"
+  (title := /-- Object parser instantiates every reachable parser call -/)
+  (statement := /-- The escape-free object parser supplies the uniform family for its explicit shallow-ignore/trailing-whitespace domain, with exact parser cost and free-list bound max F 1 + 1. This is an input-restricted instance, not discharge of the general parser family. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.parser_family

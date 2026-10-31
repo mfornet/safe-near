@@ -340,6 +340,13 @@
     "WNear.Binary.BalanceOf297AbsentCall.object_case_accepted",
     "WNear.Binary.BalanceOf297AbsentCall.object_case_no_issue",
     "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
-    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation"
+    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
+    "WNear.Binary.BalanceOf297AbsentCall.ParserFamily",
+    "WNear.Binary.BalanceOf297AbsentCall.provider_deref_parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.provider_expect_deref_parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.provider_input_parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.provider_input_setup_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.provider_absent_body",
+    "WNear.Binary.SerdeObjectNoEsc.parser_family"
   ]
 }

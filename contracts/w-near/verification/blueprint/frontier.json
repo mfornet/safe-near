@@ -3089,9 +3089,10 @@
       "title": "Whole object absent-account method body",
       "kind": "theorem",
       "label": "frontier:object-absent-body",
-      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "notes": "Checked specialization of the shared whole-body composition using the concrete object parser family and actual retained code resources. Original statement, depth bound, gas, memory and host premises are preserved; the uniform parser family is instantiated, while RegOk remains explicit until initial-resource composition.",
       "required_proof_dependencies": [
-        "object-input-setup-through-cleanup"
+        "provider-absent-body",
+        "object-parser-family-instance"
       ],
       "reviewed_shape_hash": 1844833367,
       "required_type_dependencies": [
@@ -3274,6 +3275,109 @@
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 3187448350,
       "indirect_admission": true
+    },
+    {
+      "id": "parser-family",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.ParserFamily",
+      "title": "Uniform parser provider at actual balance call sites",
+      "kind": "verification_contract",
+      "label": "frontier:parser-family",
+      "notes": "Exact successful-parser family: all credit budgets, call depths with 45 levels reserved, aligned stack pointers with 448 bytes, output/input pointers and initial-or-grown input heap states. Retains key/identifier bytes and declares parser gas and returned free-list bound. This interface is Open in general; it does not assert every accepted input satisfies it.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 8220174524993068350
+    },
+    {
+      "id": "provider-deref-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_deref_parser_through_cleanup",
+      "title": "Parser provider through input dereference",
+      "kind": "theorem",
+      "label": "frontier:provider-deref-through-cleanup",
+      "notes": "Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated.",
+      "required_proof_dependencies": [
+        "parser-provider-through-cleanup"
+      ],
+      "reviewed_shape_hash": 3930538870,
+      "required_type_dependencies": [
+        "parser-family"
+      ]
+    },
+    {
+      "id": "provider-expect-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_expect_deref_parser_through_cleanup",
+      "title": "Parser provider through option unwrap",
+      "kind": "theorem",
+      "label": "frontier:provider-expect-through-cleanup",
+      "notes": "Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated.",
+      "required_proof_dependencies": [
+        "provider-deref-through-cleanup"
+      ],
+      "reviewed_shape_hash": 46493879,
+      "required_type_dependencies": [
+        "parser-family"
+      ]
+    },
+    {
+      "id": "provider-input-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_input_parser_through_cleanup",
+      "title": "Parser provider through actual input allocation",
+      "kind": "theorem",
+      "label": "frontier:provider-input-through-cleanup",
+      "notes": "Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated.",
+      "required_proof_dependencies": [
+        "provider-expect-through-cleanup"
+      ],
+      "reviewed_shape_hash": 1921281570,
+      "required_type_dependencies": [
+        "parser-family",
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "provider-input-setup-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_input_setup_through_cleanup",
+      "title": "Parser provider through input setup",
+      "kind": "theorem",
+      "label": "frontier:provider-input-setup-through-cleanup",
+      "notes": "Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated.",
+      "required_proof_dependencies": [
+        "provider-input-through-cleanup"
+      ],
+      "reviewed_shape_hash": 1981990520,
+      "required_type_dependencies": [
+        "parser-family",
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "provider-absent-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_absent_body",
+      "title": "Whole absent-account body from a parser provider",
+      "kind": "theorem",
+      "label": "frontier:provider-absent-body",
+      "notes": "Checked actual function-297 composition from a uniform successful parser provider through storage lookup, zero-balance return and cleanup. Parser cost and output free-list bound remain explicit parameters. The provider family remains an unresolved dependency unless concretely instantiated.",
+      "required_proof_dependencies": [
+        "provider-input-setup-through-cleanup"
+      ],
+      "reviewed_shape_hash": 2983338911,
+      "required_type_dependencies": [
+        "parser-family",
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "object-parser-family-instance",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.parser_family",
+      "title": "Object parser instantiates every reachable parser call",
+      "kind": "theorem",
+      "label": "frontier:object-parser-family-instance",
+      "notes": "The escape-free object parser supplies the uniform family for its explicit shallow-ignore/trailing-whitespace domain, with exact parser cost and free-list bound max F 1 + 1. This is an input-restricted instance, not discharge of the general parser family.",
+      "required_proof_dependencies": [
+        "object-parser-instance"
+      ],
+      "reviewed_shape_hash": 551681670,
+      "required_type_dependencies": [
+        "parser-family"
+      ]
     }
   ],
   "reviewed_environment": [

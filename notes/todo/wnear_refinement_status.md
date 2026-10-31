@@ -33,6 +33,40 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: uniform parser provider integrated into the full body
+
+The completed object receipt now uses `provider_absent_body`, a shared checked
+composition of the actual function-297 prologue, input allocation, option unwrap,
+dereference, parser, initialized storage lookup, zero return and cleanup.
+`ParserFamily` states the exact uniform successful parser interface at every
+reachable call site, including the credit budget, call depth, stack alignment,
+input/output addresses, initial-or-grown heap length, retained static bytes,
+parser gas and returned free-list bound. Generic callers remain **Conditional**
+on that named **Open** family; it is not a claim that every accepted input
+satisfies the fixed successful-parser resource interface.
+
+`SerdeObjectNoEsc.parser_family` concretely instantiates this family for the
+existing escape-free object/shallow-ignore domain. `object_absent_body` is now
+a checked specialization of the generic body and that instance. Its original
+statement, depth reserve, resource premises and gas are unchanged. The existing
+initial-resource theorem discharges RegOk, then the actual entry/activation,
+model gas and receipt theorems carry this composition to global callers.
+Thus the closed object receipt stays **Proven and Integrated**, while the
+general parser family, IgnoreHyp, KeyConditions and ValueConditions stay **Open**.
+No admission is introduced or moved, no allowlist changes, and every old
+statement pin must remain byte-identical.
+
+The remaining frontier is still escaped/nested parsing with its actual resource
+and gas bounds, registered/uninitialized states, rejection/rollback, protocol
+instantiation and the remaining methods. Next: connect a provider over the full
+instantiated code context to metered method execution, then discharge additional
+parser/state cases using that composition. Full binary refinement is incomplete.
+Strict full audit and fresh actual-dependency/readiness export passed at
+2026-10-31T04:29:36+00:00 for proof source `dacbf0776e3f2669a11f65f745cf246dc7d19e6c9a738d2410971dff6afdc91b`. Every old statement pin remains byte-identical.
+Frontier policy regressions, Lean style and toolchain checks passed. Publication
+requires matching served revision, source/build/audit evidence and checked edges.
+
+
 ## Continuation on 2026-10-31: object case reaches full receipt refinement
 
 `object_absent_refines_init` proves the full receipt result for initialized

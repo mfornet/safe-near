@@ -1,3 +1,4 @@
+import Bridge.Functions.BalanceOf297ParserFamily
 import Bridge.Functions.BalanceOf297ObjectParser
 import Bridge.Functions.BalanceOf297CopiedBody
 
@@ -755,33 +756,19 @@ theorem object_absent_body (cfg : WasmConfig) (lim : ExecLimits) (d inst e : Nat
     #F96, #F158, #F779, #F545, #F456, #Hdrop, #F68, #HIC, #Hi, #HIgn, Hc, Hg, Hstk, Hhook, Hsetupkey, T116, T106,
     HB, HV, V36, T44, Hvt, Hstatekey, Hhost, Hinv, Hopt, HoptTail, Hesc, Hutf, Hhex, HFr, HstateTail,
     A0, A8, HdestTail, B0, B8, Hderef, Hvec, HcontractTail, Hob, HD, Hout, Hhead, HΦ⟩
-  have hsp : (s + 160).toNat = s.toNat + 160 := by simp [UInt32.toNat_add]; have := s.toNat_lt; omega
-  have hrestore : s + 160 - 160 = s := by simp
-  have hseg : f297.body = body297Prologue ++ (f297.body.drop 9).take 141 := by rfl
-  rw [hseg]
-  icases stk_split n (s.toNat - 592) 512 80 $$ Hstk with ⟨Hlo, Htop⟩
-  ihave Htop := stk_addr (show s.toNat - 592 + 512 = (s + 160).toNat - 240 by omega) $$ Htop
-  iapply (prologue297 cfg lim d inst mi A n g ta hm (by omega) Cg
-    (3 * cfg.regularOpCost + (100 * cfg.regularOpCost + cost527 cfg h0 +
-      (100 * cfg.regularOpCost + (100 * cfg.regularOpCost + (1000 * cfg.regularOpCost +
-        (SerdeObjectNoEsc.parserCost cfg 1 bs jsonRest N) +
-        parserSuccessCost cfg (2) h S a R)))))
-    gt (s + 160) x1 x2 x3 (by omega) (by rw [hsp]; omega) hookOld k3 ((f297.body.drop 9).take 141) Φ)
-  iframe HA Hc Hg Htop Hhook Hsetupkey T116 T106 HB HV V36 T44
-  iintro Hc Hg Htop HI
-  rw [hrestore]
-  ihave Htop := stk_addr (show (s + 160).toNat - 240 = s.toNat - 592 + 512 by omega) $$ Htop
-  ihave Hstk := stk_join n (s.toNat - 592) 512 80 $$ [Hlo Htop]
-  · iframe Hlo Htop
-  have Hsuffix := object_input_setup_through_cleanup (GF := GF) cfg lim d inst e mi A n g ta mx hm hd Cg R gt s x1 x2 x3
-    idx len a live bs oldOpt optTail oldVec jsonRest derefOut N ob stateTail contractTail destTail out head
-    oldA oldB oldC oldD hs hal (by omega) hopt hoptTail holdVec hderef hlen hnb hbase ho hloop hend hob hstateTail hcontractTail hdestTail hA hB hout hhead h0 h hinput hafter hinputLimit hok
-    S st hv hacc hlim hcanon hlink bud hproof hbudget hlimAccount hnone hreg ptr0 hret Φ
-  simp only [frame] at Hsuffix
-  iapply Hsuffix
-  simp only [frame]
-  iframe Hin F527 HC66 H169 H646 F644 F66 F65 F157 HSC F219 F155 F951 HC F293 HTV F96 F158 F779 F545 F456
-    Hdrop F68 HIC Hi HIgn Hc Hg HI Hstk Hvt Hstatekey Hhost Hinv Hopt HoptTail Hesc Hutf Hhex HFr HstateTail
+  have hf := SerdeObjectNoEsc.parser_family (GF := GF) cfg lim inst mi A n g ta hm gt bs jsonRest a N 1 hnb ho hloop hend
+  have hp := provider_absent_body (GF := GF) cfg lim d inst e mi A n g ta mx hm hd Cg R gt s x1 x2 x3
+    idx len a live bs oldOpt optTail oldVec derefOut (SerdeObjectNoEsc.parserCost cfg 1 bs jsonRest N) 2
+    (SerdeObjectNoEsc.parserCode n inst mi A) ob stateTail contractTail destTail out head oldA oldB oldC oldD hookOld k3
+    hs hal hframe hopt hoptTail holdVec hderef hlen hbase hob hstateTail hcontractTail hdestTail hA hB hout hhead
+    h0 h hinput hafter hinputLimit hok S st hv hacc hlim hcanon hlink bud hproof hbudget hlimAccount hnone hreg ptr0 hret Φ hf
+  iapply hp
+  isplitr
+  · iunfold SerdeObjectNoEsc.parserCode
+    iframe HC66 H169 H646 Hdrop HIgn F644 F66 Hi
+  iframe HA Hin F527 HC66 H169 H646 F644 F66 F65 F157 HSC F219 F155 F951 HC F293 HTV
+    F96 F158 F779 F545 F456 Hdrop F68 HIC Hi HIgn Hc Hg Hstk Hhook Hsetupkey T116 T106
+    HB HV V36 T44 Hvt Hstatekey Hhost Hinv Hopt HoptTail Hesc Hutf Hhex HFr HstateTail
     A0 A8 HdestTail B0 B8 Hderef Hvec HcontractTail Hob HD Hout Hhead HΦ
 
 end WNear.Binary.BalanceOf297AbsentCall

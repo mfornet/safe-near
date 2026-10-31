@@ -62,6 +62,31 @@ class FrontierPolicyTests(unittest.TestCase):
         self.audit = {'violations': [{'declaration': n, 'axioms': ['sorryAx']}
                                      for n in self.manifest['expected_incomplete']]}
 
+    def test_uniform_parser_family_is_instantiated_without_closing_the_general_contract(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['parser-family']['status'], 'Open')
+        self.assertEqual(result['object-parser-family-instance']['status'], 'Conditional')
+        self.assertEqual(result['provider-absent-body']['status'], 'Conditional')
+        self.assertEqual(result['balance-object-case-refinement']['status'], 'Proven')
+        for source in ['provider-absent-body', 'object-parser-family-instance']:
+            self.assertIn({'id': 'object-absent-body', 'status': 'Conditional'},
+                          result[source]['integrated_into'])
+        for node in ['ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_object_body_cannot_lose_uniform_provider_instantiation(self):
+        self.by_id['object-absent-body']['proof_dependencies'].remove(
+            self.nodes['object-parser-family-instance']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_provider_body_cannot_hide_its_parser_family(self):
+        self.by_id['provider-absent-body']['type_dependencies'].remove(
+            self.nodes['parser-family']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness|verification hypotheses'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_object_receipt_case_is_integrated_without_hiding_general_obligations(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         self.assertEqual(result['balance-object-case-refinement']['status'], 'Proven')
