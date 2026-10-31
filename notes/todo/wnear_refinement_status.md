@@ -33,6 +33,63 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: reader room constructed through the full receipt pipeline
+
+Concrete key and account-value reader room is now constructed from the retained
+mixed ledger. A requested-page reserve theorem covers fitting, no-growth and
+heap-growth outcomes and preserves the allowance for later reserves. A raw
+successful string room trace supplies every reserve/error-box room contract.
+Its conservative borrowed-tail reserve is explicit. For copied strings that
+trace equals the actual appendChunks sequence: positive escape output keeps
+recursive accumulators copied. Borrowed keys use the existing no-allocation
+key-room interface, avoiding a nonexistent hypothetical append charge.
+
+Appending any successful key/account string model to the retained ledger bounds
+that reader's page requests by the existing global 18,164,618-byte bound. This
+is one global retained history, with the actual starting capacity and free bound.
+The ledger's physical heap ceiling leaves enough room for the complete copied
+key run. Generic string-room constructors remain visibly Conditional because
+their page/room interfaces are explicit; the concrete key-room theorem constructs
+those instances with no reader-room hypothesis.
+
+For account strings of at most 64 bytes, a reserve that does not fit forces its
+old capacity small. A larger retained capacity needs no growth. This removes
+the old capacity-at-most-128 restriction from the short-string room constructor.
+The actual ledger heap, account size and append-page bound now construct error
+box, string and separate account allocation room, including valid escapes and
+retained capacity. The generic room interfaces are preserved and checked.
+
+New KeyGasCharges and ValueGasCharges state exactly the remaining keyCost and
+valueCost bounds against the selected K functions. Checked constructors combine
+those gas witnesses with concrete ledger room to instantiate the unchanged
+KeyRoomCharges and ValueRoomCharges. The full actual parser family, deployed
+code provider, original-budget plan and initialized absent-account receipt now
+compose using these instances. Their type-level reader frontier contains only
+KeyGasCharges, ValueGasCharges and IgnoreCharges; no reader-room obligation is
+assumed in the new receipt composition. Actual input setup, full container code,
+retained scratch cleanup, output free bound 44, original parser cost and public
+receipt observations remain unchanged.
+
+The receipt theorem remains Conditional on those named gas contracts and the
+same ProviderModelBudget. This does not prove gas domination within the original
+model allowance. Generic IgnoreHyp, KeyConditions, ValueConditions, room
+interfaces and earlier public APIs remain visible and unchanged. Remaining
+balance states/inputs, rejected-call behavior, other methods and pinned protocol
+instances are still incomplete. The next frontier is the shared concrete gas
+witness for keys, account/ignored readers and the complete method budget.
+
+Frontier classification now also rejects duplicate node IDs, labels,
+declarations and exported Lean rows before they can collapse status/dependency
+maps. This strengthens the existing policy; the original completed key-budget
+node retains its identity and Proven status.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T11:13:36+00:00 for proof source `fc714d5693cafca36c18d34070474b97d83f4da049564c2bd05d5059e2f995fb`. All 79 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical; concrete reader room/gas interfaces are pinned
+additively. The exact admission frontier and original gas/observation/domain
+statements are unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: general object ledger reaches the actual receipt pipeline
 
 The ledger object contract now composes through actual f78, f66 and f65.

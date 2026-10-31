@@ -169,6 +169,13 @@ run_cmd do
 
 
 def classify(manifest, rows, audit=None):
+    for key in ('id', 'declaration', 'label'):
+        values = [n[key] for n in manifest['nodes']]
+        if len(values) != len(set(values)):
+            raise ValueError(f'Duplicate frontier {key}')
+    declarations = [r['declaration'] for r in rows]
+    if len(declarations) != len(set(declarations)):
+        raise ValueError('Duplicate Lean declaration in frontier export')
     indexed = {r['declaration']: r for r in rows}
     nodes = {n['declaration']: n for n in manifest['nodes']}
     if set(indexed) != set(nodes):

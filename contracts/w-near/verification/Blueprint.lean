@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeObjectLedgerGas
 import Bridge.Functions.SerdeObjectLedgerProvider
 import Bridge.Functions.SerdeObjectLedgerComposition
 import Bridge.Functions.SerdeObjectCostComposition
@@ -2384,3 +2385,91 @@ attribute [blueprint "frontier:ledger-receipt"
   (statement := /-- Composes the concrete object provider plan through the existing initialized absent-account receipt theorem: safety, sufficient-resource Matches/used gas, arbitrary-resource Matches or rollback/log-prefix resource failure. It remains Conditional on named reader charges, unchanged ProviderModelBudget and reviewed protocol/environment premises. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectMixedTrace.ledger_refines_init
+
+attribute [blueprint "frontier:string-page-reserve"
+  (title := /-- Requested pages cover every reserve heap outcome -/)
+  (statement := /-- Constructs reserve room and all permitted next-heap room instances from a page allowance, with alignment/positivity and 32-bit limits explicit. Generic room interfaces remain visible. -/)
+  (notReady := true)]
+  WNear.Binary.ParseStrRoom.reserve_pages_room
+
+attribute [blueprint "frontier:string-page-run"
+  (title := /-- A successful string page trace supplies recursive room -/)
+  (statement := /-- Constructs roomRun for every growth/error-box prefix of a successful raw string run. The conservative borrowed-tail reserve is represented explicitly; this generic page-allowance premise is not assumed in concrete ledger room. -/)
+  (notReady := true)]
+  WNear.Binary.ParseStrRoom.roomRun_pages
+
+attribute [blueprint "frontier:string-room-trace"
+  (title := /-- Copied-string room trace is the actual append trace -/)
+  (statement := /-- A successful copied string, or a nonempty prior accumulator, has exactly the real appendChunks reserve trace. Escape output positivity establishes the recursive copied state. -/)]
+  WNear.Binary.ParseStrRoom.roomChunks_copied
+
+attribute [blueprint "frontier:string-any-short"
+  (title := /-- Short strings have room with any retained capacity -/)
+  (statement := /-- Removes the old capacity-at-most-128 restriction: a non-fitting short reserve itself forces the old capacity small, while larger retained capacities fit. Generic initial page room remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.ParseStrRoom.roomRun_short_any
+
+attribute [blueprint "frontier:ledger-reader-pages"
+  (title := /-- Every ledger string suffix fits the global page bound -/)
+  (statement := /-- Extends the retained model ledger by the actual successful string segment, bounding that reader alone by the global 18,164,618 requested-page bytes. Does not reset capacity or charge the entire prefix again. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.append_pages_bound
+
+attribute [blueprint "frontier:ledger-account-room"
+  (title := /-- Concrete ledger constructs all account reader room -/)
+  (statement := /-- Ledger heap ceiling, owned alignment/positivity, account length and actual append pages construct error-box, string and account-allocation room. This is a checked constructor of the generic room interfaces, with no reader-room hypothesis. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.account_room
+
+attribute [blueprint "frontier:object-value-gas"
+  (title := /-- Remaining account reader gas allowance -/)
+  (statement := /-- Only the exact actual valueCost versus the chosen K remains here. Concrete error/string/account-allocation room is constructed from the ledger; no room or state closure premise is hidden in this contract. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ValueGasCharges
+
+attribute [blueprint "frontier:ledger-value-gas-charges"
+  (title := /-- Account room/gas interface from ledger room and gas -/)
+  (statement := /-- Instantiates the old ValueRoomCharges with checked ledger room and only the named ValueGasCharges obligation. The gas obligation remains Open until the original parser budget chooses K. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.value_charges
+
+attribute [blueprint "frontier:ledger-key-room"
+  (title := /-- Concrete ledger supplies successful key reader room -/)
+  (statement := /-- Borrowed keys use the existing no-allocation error-room contract. Copied keys use the actual append trace and the global ledger page bound to construct every reserve/error-box room instance. No key-room premise is assumed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.key_room
+
+attribute [blueprint "frontier:object-key-gas-obligation"
+  (title := /-- Remaining key reader gas allowance -/)
+  (statement := /-- Only the exact keyCost versus the selected per-cursor K remains. Concrete key room is proved from the actual ledger; the gas witness is still unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.KeyGasCharges
+
+attribute [blueprint "frontier:ledger-key-gas-charges"
+  (title := /-- Key room/gas interface from ledger room and gas -/)
+  (statement := /-- Instantiates old KeyRoomCharges from concrete ledger key room and the named KeyGasCharges. It does not prove gas domination or alter the old interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.key_charges
+
+attribute [blueprint "frontier:ledger-gas-family"
+  (title := /-- Shared parser family needs only reader gas obligations -/)
+  (statement := /-- Constructs the old key/value room/gas hypotheses for every real initial/input heap before invoking the existing actual parser family. Remaining reader obligations are gas-only; whole-model gas is not supplied here. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_gas_parser_family
+
+attribute [blueprint "frontier:ledger-gas-provider"
+  (title := /-- Actual-code provider with reader room instantiated -/)
+  (statement := /-- Uses actual instantiated function cells and the shared family with checked reader room. Initial F=1/output F=44 and the same real parser cost are retained. Key/value/ignored gas remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_gas_deployed_parser_provider
+
+attribute [blueprint "frontier:ledger-gas-plan"
+  (title := /-- Original-budget plan from the gas-only reader frontier -/)
+  (statement := /-- Couples the same selected K costs and actual provider with unchanged ProviderModelBudget. Concrete reader room is constructed, while all reader gas and the whole-method budget remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_gas_provider_plan
+
+attribute [blueprint "frontier:ledger-gas-receipt"
+  (title := /-- Full receipt composition with reader room discharged -/)
+  (statement := /-- Checked initialized absent-account receipt refinement now assumes only named reader gas and the original whole-model budget, plus reviewed protocol/environment premises. It proves the same safety, sufficient-resource Matches/used gas and arbitrary-resource rollback/log-prefix alternatives conditionally. No room predicate is a remaining reader hypothesis. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_gas_refines_init

@@ -354,6 +354,67 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_reader_room_is_constructed_and_only_gas_remains_in_receipt(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['string-room-trace', 'ledger-reader-pages']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['string-page-reserve', 'string-page-run', 'string-any-short', 'ledger-account-room',
+                     'ledger-value-gas-charges', 'ledger-key-gas-charges', 'ledger-key-room', 'ledger-gas-family',
+                     'ledger-gas-provider', 'ledger-gas-plan', 'ledger-gas-receipt']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['object-key-gas-obligation', 'object-value-gas', 'object-ignore-charges', 'provider-model-budget',
+                     'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['ledger-gas-family', 'ledger-gas-provider', 'ledger-gas-plan', 'ledger-gas-receipt']:
+            self.assertFalse({'object-key-room-charges', 'object-value-room-charges', 'string-room',
+                              'owned-room', 'object-ledger-setup'} & set(result[node]['type_edges']))
+        for source in ['ledger-value-gas-charges', 'ledger-key-gas-charges']:
+            self.assertIn({'id': 'ledger-gas-family', 'status': 'Conditional'}, result[source]['integrated_into'])
+
+    def test_concrete_key_room_cannot_drop_copied_trace_identity(self):
+        self.by_id['ledger-key-room']['proof_dependencies'].remove(self.nodes['string-room-trace']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_gas_family_cannot_assume_account_reader_room(self):
+        self.by_id['ledger-gas-family']['proof_dependencies'].remove(self.nodes['ledger-value-gas-charges']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_gas_receipt_cannot_hide_remaining_key_gas(self):
+        self.by_id['ledger-gas-receipt']['type_dependencies'].remove(self.nodes['object-key-gas-obligation']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_account_room_cannot_skip_retained_page_bound(self):
+        self.by_id['ledger-account-room']['proof_dependencies'].remove(self.nodes['ledger-reader-pages']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_duplicate_node_id_is_rejected_before_status_collapse(self):
+        self.manifest['nodes'][-1]['id'] = self.manifest['nodes'][0]['id']
+        with self.assertRaisesRegex(ValueError, 'Duplicate frontier id'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_duplicate_blueprint_label_is_rejected(self):
+        self.manifest['nodes'][-1]['label'] = self.manifest['nodes'][0]['label']
+        self.rows[-1]['blueprint_label'] = self.rows[0]['blueprint_label']
+        with self.assertRaisesRegex(ValueError, 'Duplicate frontier label'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_duplicate_frontier_declaration_is_rejected(self):
+        self.manifest['nodes'].append(copy.deepcopy(self.manifest['nodes'][-1]))
+        self.manifest['nodes'][-1]['id'] += '-duplicate'
+        self.manifest['nodes'][-1]['label'] += '-duplicate'
+        with self.assertRaisesRegex(ValueError, 'Duplicate frontier declaration'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_duplicate_lean_export_row_is_rejected(self):
+        self.rows.append(copy.deepcopy(self.rows[-1]))
+        with self.assertRaisesRegex(ValueError, 'Duplicate Lean declaration'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
