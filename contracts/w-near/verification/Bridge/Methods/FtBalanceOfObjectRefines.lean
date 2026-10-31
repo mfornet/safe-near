@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfObjectProviderPlan
 import Bridge.Methods.FtBalanceOfObjectRun
 import Bridge.Methods.FtBalanceOfObjectGas
 import Bridge.Methods.FtBalanceOfCopiedPre
@@ -35,16 +36,9 @@ theorem object_absent_refines_with_obligations (cfg : WNear.Config) (size : Nat)
       Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx modelSt (.ftBalanceOf a)) ∧
     (Matches (WNear.wnear cfg) ctx raw r res ∨
       (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
-  have hbound := object_total_cost_le_model cfg ctx raw modelSt S a bs rest N size hc hsize hentry.2.input
-    hlen hreceipt hnb ho hloop hentry.2.value hentry.2.absent
-  exact method_refines_callR (WNear.wnear cfg) size codeOf raw modelSt ctx (.ftBalanceOf a)
-    (CopiedAbsentPre S a bs tr bud) (objectMethodCost ctx.protocol S a bs rest N) (copiedMethodPost a tr)
-    hp hwf (by rw [hm]; decide) (by rw [hm]; exact export_297) funcType_297 (by decide) (by decide)
-    (object_absent_runs ctx.protocol S a bs rest N tr bud hlen hnb ho hloop hend )
-    hentry.1 hentry.2
-    (fun e he => copied_post_noPromises (e := erase (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
-    (fun e he => copied_post_noPromises (e := eraseP (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
-    hag hagP (by simpa only [objectMethodCost, Nat.add_assoc] using hbound)
+  exact provider_plan_refines_with_obligations cfg size codeOf raw modelSt ctx S a bs tr bud hp hwf hm
+    (object_provider_plan cfg ctx raw modelSt S a bs rest N size hc hsize hentry.2.input hlen hreceipt
+      hnb ho hloop hend hentry.2.value hentry.2.absent) hentry hag hagP
 
 end WNear.Binary.BalanceOf297AbsentCall
 

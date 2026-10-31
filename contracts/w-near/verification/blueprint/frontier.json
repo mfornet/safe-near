@@ -3164,9 +3164,10 @@
       "title": "Metered object MethodRunsR",
       "kind": "theorem",
       "label": "frontier:object-runs",
-      "notes": "Connects the 11-operation activation charge and actual method body to the existing two-storage-read/zero-return postcondition, for the exact code and initialized resources.",
+      "notes": "The original object MethodRunsR statement is now a checked specialization of actual-code provider execution using the concrete object provider; activation, costs and postcondition are unchanged.",
       "required_proof_dependencies": [
-        "object-entry-adequacy"
+        "provider-runs",
+        "object-deployed-parser-provider"
       ],
       "reviewed_shape_hash": 1370195125
     },
@@ -3221,10 +3222,10 @@
       "title": "Escape-free object, absent account: receipt refinement",
       "kind": "theorem",
       "label": "frontier:balance-object-case-refinement",
-      "notes": "Proven full receipt result for initialized represented state, an unregistered account, escape-free object input up to 4 MiB, shallow ignored values and trailing whitespace only. Proves no executionIssue, sufficient-resource Matches and original gas bound, and arbitrary-resource Matches or resource failure with rollback and log prefix. Context/storage instantiate the entry, trie/proof budget and model agreement. Other input/state cases remain unresolved.",
+      "notes": "Proven full receipt refinement for initialized represented state, an unregistered account, escape-free object input up to 4 MiB, shallow ignored values and trailing whitespace. The concrete object parser/resource/gas plan is instantiated through checked actual-code receipt composition. Original observations and gas are unchanged; other cases remain unresolved.",
       "required_proof_dependencies": [
-        "object-runs",
-        "object-total-model-gas",
+        "provider-plan-receipt-obligations",
+        "object-provider-plan",
         "balance-copied-entry-at",
         "balance-copied-model-agreement"
       ],
@@ -3258,23 +3259,29 @@
       "id": "balance-outside-array-object-no-issue",
       "declaration": "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
       "title": "ft_balance_of: safety outside completed array/object cases",
-      "kind": "admission",
+      "kind": "theorem",
       "label": "frontier:balance-outside-array-object-no-issue",
-      "notes": "Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 690425189,
-      "indirect_admission": true
+      "notes": "Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "balance-absent-parser-plan",
+        "provider-plan-receipt-initial",
+        "balance-other-input-state-safety"
+      ],
+      "reviewed_shape_hash": 690425189
     },
     {
       "id": "balance-outside-array-object-accepted",
       "declaration": "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
       "title": "ft_balance_of: accepted outside completed array/object cases",
-      "kind": "admission",
+      "kind": "theorem",
       "label": "frontier:balance-outside-array-object-accepted",
-      "notes": "Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 3187448350,
-      "indirect_admission": true
+      "notes": "Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "balance-absent-parser-plan",
+        "provider-plan-receipt-initial",
+        "balance-other-state-accepted"
+      ],
+      "reviewed_shape_hash": 3187448350
     },
     {
       "id": "parser-family",
@@ -3378,6 +3385,257 @@
       "required_type_dependencies": [
         "parser-family"
       ]
+    },
+    {
+      "id": "provider-initial-store",
+      "declaration": "WNear.Binary.InitialState.startRes297Provider",
+      "title": "Initial store retains the full parser code context",
+      "kind": "theorem",
+      "label": "frontier:provider-initial-store",
+      "notes": "Persists the actual instantiated function cells, instance and memory limit before carving memory once. Supplies the full source code context together with the existing body code, frame, statics and host resources.",
+      "required_proof_dependencies": [
+        "object-initial-memory",
+        "object-initial-ignore-code"
+      ],
+      "reviewed_shape_hash": 3109017967
+    },
+    {
+      "id": "object-parser-code-context",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.parser_code_of_context",
+      "title": "Actual source code supplies the concrete object parser",
+      "kind": "theorem",
+      "label": "frontier:object-parser-code-context",
+      "notes": "Extracts the concrete object parser code from the full instantiated code context, using checked parser/return function-cell projections and the ignored-reader code.",
+      "required_proof_dependencies": [
+        "object-initial-ignore-code"
+      ],
+      "reviewed_shape_hash": 328732850
+    },
+    {
+      "id": "parser-family-code-transport",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_family_mono",
+      "title": "Parser family follows checked code entailment",
+      "kind": "theorem",
+      "label": "frontier:parser-family-code-transport",
+      "notes": "Transports the exact parser family along an Iris entailment between persistent code contexts. The parser-family premise remains explicit.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2395022374,
+      "required_type_dependencies": [
+        "parser-family"
+      ]
+    },
+    {
+      "id": "deployed-parser-provider",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider",
+      "title": "Parser provider over the actual deployed code context",
+      "kind": "verification_contract",
+      "label": "frontier:deployed-parser-provider",
+      "notes": "Uniform successful parser family over every initial host state and actual proof-model instance, with code supplied by funcCells in wStore. Parser gas and returned free-list bound are explicit. General accepted inputs still need a concrete instance.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 8288688471183121810
+    },
+    {
+      "id": "object-deployed-parser-provider",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.deployed_parser_provider",
+      "title": "Object parser supplies the actual-code provider",
+      "kind": "theorem",
+      "label": "frontier:object-deployed-parser-provider",
+      "notes": "Concrete escape-free/shallow-object provider, transported from the checked object family to the whole instantiated code context for every entry host state. The output is an input-restricted provider instance.",
+      "required_proof_dependencies": [
+        "parser-family-code-transport",
+        "object-parser-code-context",
+        "object-parser-family-instance"
+      ],
+      "reviewed_shape_hash": 1096567430,
+      "required_type_dependencies": [
+        "deployed-parser-provider"
+      ]
+    },
+    {
+      "id": "provider-initial-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_absent_body_initial_resources",
+      "title": "Provider body closes input allocation room",
+      "kind": "theorem",
+      "label": "frontier:provider-initial-body",
+      "notes": "Derives RegOk from actual initial memory and positive bounded input, then composes the full provider-based body. The precise uniform parser family remains explicit.",
+      "required_proof_dependencies": [
+        "provider-absent-body",
+        "initial-memory-parser-room"
+      ],
+      "reviewed_shape_hash": 1805167386,
+      "required_type_dependencies": [
+        "parser-family"
+      ]
+    },
+    {
+      "id": "provider-entry-adequacy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_absent_adequate",
+      "title": "Actual-code provider entry adequacy",
+      "kind": "theorem",
+      "label": "frontier:provider-entry-adequacy",
+      "notes": "Adequacy from the complete actual initialized store. The store retains the full parser code context, and the body consumes the exact family at its actual input allocation state.",
+      "required_proof_dependencies": [
+        "provider-initial-store",
+        "provider-initial-body"
+      ],
+      "reviewed_shape_hash": 3158167880,
+      "required_type_dependencies": [
+        "parser-family"
+      ]
+    },
+    {
+      "id": "provider-runs",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_absent_runs",
+      "title": "Actual-code provider metered MethodRunsR",
+      "kind": "theorem",
+      "label": "frontier:provider-runs",
+      "notes": "Composes the actual eleven-operation activation charge, entry adequacy and the two-read/zero-return postcondition. Uniform actual-code parser execution remains a named obligation.",
+      "required_proof_dependencies": [
+        "provider-entry-adequacy"
+      ],
+      "reviewed_shape_hash": 3960491115,
+      "required_type_dependencies": [
+        "deployed-parser-provider"
+      ]
+    },
+    {
+      "id": "provider-model-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget",
+      "title": "Whole provider execution fits the original model budget",
+      "kind": "verification_contract",
+      "label": "frontier:provider-model-budget",
+      "notes": "Exact budget obligation for loading, activation and provider body, including parser cost, allocator cleanup, host input/storage/return and trie charges. The original model gas bound is unchanged.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 5368509748383843153
+    },
+    {
+      "id": "provider-receipt-obligations",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_absent_refines_with_obligations",
+      "title": "Provider execution reaches complete receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:provider-receipt-obligations",
+      "notes": "Checked safety, sufficient-resource Matches and used-gas bound, plus arbitrary-resource Matches or failure with rollback/log prefix. The actual-code provider and original model-budget obligation remain explicit; entry and model agreement are supplied by the caller.",
+      "required_proof_dependencies": [
+        "provider-runs"
+      ],
+      "reviewed_shape_hash": 696781873,
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ]
+    },
+    {
+      "id": "provider-receipt-initial",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_absent_refines_init",
+      "title": "Represented initialized state closes runtime premises",
+      "kind": "theorem",
+      "label": "frontier:provider-receipt-initial",
+      "notes": "Derives the actual entry, storage/trie/proof-budget and model agreement from Context.WF and represented initialized state with an absent account. Only parser execution and its whole-method model budget remain explicit.",
+      "required_proof_dependencies": [
+        "provider-receipt-obligations",
+        "balance-copied-entry-at",
+        "balance-copied-model-agreement"
+      ],
+      "reviewed_shape_hash": 1341891371,
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ]
+    },
+    {
+      "id": "absent-parser-plan",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.AbsentParserPlan",
+      "title": "Coupled parser, resource and model-gas witness",
+      "kind": "verification_contract",
+      "label": "frontier:absent-parser-plan",
+      "notes": "A single parseGas/outF witness must satisfy positive input below 2^24 bytes, actual-code successful parser execution and the unchanged complete model budget. The witness is shared because the budget depends on that same parser cost/free-list bound; this is not another receipt-refinement assumption.",
+      "required_proof_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ],
+      "reviewed_shape_hash": 16803810249164724017
+    },
+    {
+      "id": "provider-plan-receipt-obligations",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_plan_refines_with_obligations",
+      "title": "Parser plan through checked receipt composition",
+      "kind": "theorem",
+      "label": "frontier:provider-plan-receipt-obligations",
+      "notes": "Consumes the exact parser/resource/gas plan and composes the completed actual-code method and receipt result. The plan remains Open unless concretely instantiated.",
+      "required_proof_dependencies": [
+        "provider-receipt-obligations"
+      ],
+      "reviewed_shape_hash": 179311522,
+      "required_type_dependencies": [
+        "absent-parser-plan"
+      ]
+    },
+    {
+      "id": "provider-plan-receipt-initial",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_plan_refines_init",
+      "title": "Parser plan closes initialized absent-account receipt",
+      "kind": "theorem",
+      "label": "frontier:provider-plan-receipt-initial",
+      "notes": "The top-level reusable receipt composition for initialized represented state and an unregistered account. Context, entry, trie/proof budget and model agreement are checked; parser/resource/gas correctness remains exactly the named plan.",
+      "required_proof_dependencies": [
+        "provider-receipt-initial"
+      ],
+      "reviewed_shape_hash": 3854388115,
+      "required_type_dependencies": [
+        "absent-parser-plan"
+      ]
+    },
+    {
+      "id": "object-provider-plan",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_provider_plan",
+      "title": "Object parser and gas instantiate the complete plan",
+      "kind": "theorem",
+      "label": "frontier:object-provider-plan",
+      "notes": "Supplies the shared cost/free-list witness from the actual object provider and proved complete loading/body/trie/return gas bound. Its explicit domain is escape-free objects up to 4 MiB with shallow ignored values; no general parsing obligation is discharged.",
+      "required_proof_dependencies": [
+        "object-deployed-parser-provider",
+        "object-total-model-gas"
+      ],
+      "reviewed_shape_hash": 2495274578,
+      "required_type_dependencies": [
+        "absent-parser-plan"
+      ]
+    },
+    {
+      "id": "balance-absent-parser-plan",
+      "declaration": "WNear.ftBalanceOf_absent_parser_plan_obligation",
+      "title": "Accepted absent-account inputs: parser/resource/gas witness",
+      "kind": "admission",
+      "label": "frontier:balance-absent-parser-plan",
+      "notes": "Precise remaining input obligation outside both completed array and object cases: for accepted input, represented initialized state and an unregistered account, construct the same bounded-input/parser/free-list/gas plan consumed by checked receipt composition. Protocol/domain, escaped/nested parsing and its concrete budget remain unresolved.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3179863852,
+      "required_type_dependencies": [
+        "absent-parser-plan"
+      ],
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-other-state-accepted",
+      "declaration": "WNear.ftBalanceOf_other_state_accepted_obligation",
+      "title": "Accepted calls outside initialized absent-account state",
+      "kind": "admission",
+      "label": "frontier:balance-other-state-accepted",
+      "notes": "Exact complementary accepted-input/state obligation after excluding every initialized/unregistered-account call as well as both completed cases. Registered/uninitialized behavior remains Open.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4082237725,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-other-input-state-safety",
+      "declaration": "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
+      "title": "Safety outside accepted initialized absent-account calls",
+      "kind": "admission",
+      "label": "frontier:balance-other-input-state-safety",
+      "notes": "Exact safety complement: excludes every accepted initialized/unregistered-account context and both completed cases. Rejected input, registered/uninitialized states and remaining safety behavior stay Open.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 592551965,
+      "indirect_admission": true
     }
   ],
   "reviewed_environment": [
@@ -3402,9 +3660,10 @@
     "WNear.storageWithdraw_obligation",
     "WNear.storageUnregister_obligation",
     "WNear.storageBalanceOf_obligation",
-    "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
-    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
-    "WNear.ftBalanceOf_rejected_obligation"
+    "WNear.ftBalanceOf_rejected_obligation",
+    "WNear.ftBalanceOf_absent_parser_plan_obligation",
+    "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
+    "WNear.ftBalanceOf_other_state_accepted_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -3432,6 +3691,9 @@
     "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
     "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation",
     "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
-    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation"
+    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
+    "WNear.ftBalanceOf_absent_parser_plan_obligation",
+    "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
+    "WNear.ftBalanceOf_other_state_accepted_obligation"
   ]
 }

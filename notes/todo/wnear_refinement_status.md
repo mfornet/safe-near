@@ -33,6 +33,56 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: actual-code provider reaches global receipt callers
+
+`startRes297Provider` retains the complete persistent parser code context from
+actual instantiated function cells, instance and memory limit before carving
+linear memory once. The uniform family then composes through initial input
+allocation room, full entry adequacy and eleven-operation metered activation.
+`DeployedParserProvider` names the still-Open uniform successful-parser contract
+over every actual initial host state. `ProviderModelBudget` separately names the
+unchanged complete model allowance, including loading/body/input/allocator/
+storage/trie/return charges.
+
+The checked provider receipt theorem proves execution safety, sufficient-resource
+Matches with the original gas bound, and arbitrary-resource Matches or resource
+failure with rollback/log prefix. The initialized-state version concretely
+supplies entry, trie/proof budget and model agreement from Context.WF and
+representation. `AbsentParserPlan` couples positive input below 2^24 bytes and a
+single parser-cost/free-list witness satisfying both actual-code execution and
+that exact budget. Parser and budget must share the same witness. No complete
+receipt behavior is assumed in this plan.
+
+The old broad outside-array/object safety and accepted-call statements are now
+checked splits using this complete receipt composition for **every accepted
+initialized/unregistered-account call**. Their named remaining leaves are:
+- construct the exact parser/resource/gas plan outside both completed cases;
+- accepted behavior outside initialized/unregistered-account calls;
+- execution safety outside accepted initialized/unregistered-account contexts.
+These leaves are Open and every dependent assembly remains Conditional. They
+stay in the existing strictly audited Proofs.Refinement allowance; no allowance
+is expanded. This decomposition does not prove the general parser/resource/gas
+plan, registered/uninitialized behavior, rejected input or protocol premises.
+
+The concrete object code projection, provider and complete plan are checked.
+The old object MethodRunsR and complete object receipt are now specializations
+of this actual-code pipeline. The receipt stays Proven in its explicit 4 MiB,
+escape-free/shallow-ignore domain. Its original statement and gas/observations,
+and every prior statement pin, are preserved. Arrays remain Proven as before.
+General IgnoreHyp, KeyConditions and ValueConditions remain Open. All 15 methods
+and global refinement stay tracked; full binary refinement is incomplete.
+
+Next: discharge the named general parser/resource/gas plan with concrete parsing
+and protocol-domain evidence, then complete other account/state and method cases.
+Strict full audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T04:57:57+00:00 for proof source `a73475dc2358aa3403c2d2ec6c94a1e685bd9a625de7948dbc453fe9d00d2e27`. Every old statement pin remains byte-identical;
+new code/resource/cost contracts are pinned additively. All 36 frontier policy
+tests, Lean style and toolchain checks passed. The only admission allowance is
+the existing Proofs.Refinement module, with the exact named frontier checked.
+Publication requires matching served revision, source/build/audit evidence and
+actual dependencies; no general input correctness is claimed from assembly.
+
+
 ## Continuation on 2026-10-31: uniform parser provider integrated into the full body
 
 The completed object receipt now uses `provider_absent_body`, a shared checked

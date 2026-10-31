@@ -19,7 +19,7 @@ class FrontierPolicyTests(unittest.TestCase):
             admission = n['kind'] == 'admission'
             self.rows.append({'declaration': n['declaration'], 'is_theorem': n['kind'] != 'verification_contract',
                               'direct_sorry': admission, 'shape_hash': n['reviewed_shape_hash'], 'blueprint_label': n['label'],
-                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or any(self.nodes[d]['kind'] == 'verification_contract' for d in n.get('required_type_dependencies', [])) or n['id'] in ['global', 'balance-outside-array-accepted', 'balance-outside-array-no-issue', 'balance-other-accepted', 'balance-other-no-issue', 'balance-no-issue', 'balance-accepted', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
+                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or any(self.nodes[d]['kind'] == 'verification_contract' for d in n.get('required_type_dependencies', [])) or n['id'] in ['global', 'balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue', 'balance-outside-array-accepted', 'balance-outside-array-no-issue', 'balance-other-accepted', 'balance-other-no-issue', 'balance-no-issue', 'balance-accepted', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
                               'type_dependencies': [], 'proof_dependencies': [], 'statement': 'test', 'type_hash': 1})
         self.by_id = {n['id']: row for n, row in zip(self.manifest['nodes'], self.rows)}
         for n in self.manifest['nodes']:
@@ -41,6 +41,8 @@ class FrontierPolicyTests(unittest.TestCase):
         self.by_id['balance-second-read-exact-gas']['proof_dependencies'] = [self.nodes['balance-next-read-cost-preserved']['declaration']]
         self.by_id['balance-export-state-exact-gas']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-budget', 'balance-second-read-exact-gas']]
         self.by_id['balance-export-state-six-grows']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-exact-gas', 'balance-room-after-state']]
+        self.by_id['balance-outside-array-object-accepted']['axioms'].append('sorryAx')
+        self.by_id['balance-outside-array-object-no-issue']['axioms'].append('sorryAx')
         self.by_id['balance-outside-array-accepted']['axioms'].append('sorryAx')
         self.by_id['balance-outside-array-no-issue']['axioms'].append('sorryAx')
         self.by_id['balance-other-accepted']['axioms'].append('sorryAx')
@@ -61,6 +63,48 @@ class FrontierPolicyTests(unittest.TestCase):
             self.by_id[n['id']]['type_dependencies'] += [self.nodes[x]['declaration'] for x in n.get('required_type_dependencies', [])]
         self.audit = {'violations': [{'declaration': n, 'axioms': ['sorryAx']}
                                      for n in self.manifest['expected_incomplete']]}
+
+    def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
+                     'balance-absent-parser-plan', 'balance-other-state-accepted',
+                     'balance-other-input-state-safety', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['provider-runs', 'provider-plan-receipt-initial',
+                     'balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue',
+                     'method-ft_balance_of', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+        for node in ['balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue']:
+            self.assertFalse(result[node]['direct_sorry'])
+            self.assertIn({'id': node, 'status': 'Conditional'},
+                          result['provider-plan-receipt-initial']['integrated_into'])
+        self.assertEqual(result['balance-object-case-refinement']['status'], 'Proven')
+        self.assertIn({'id': 'balance-object-case-refinement', 'status': 'Proven'},
+                      result['object-provider-plan']['integrated_into'])
+
+    def test_provider_entry_cannot_lose_actual_instantiated_store(self):
+        self.by_id['provider-entry-adequacy']['proof_dependencies'].remove(
+            self.nodes['provider-initial-store']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_top_accepted_split_cannot_hide_the_unproved_parser_plan(self):
+        self.by_id['balance-outside-array-object-accepted']['proof_dependencies'].remove(
+            self.nodes['balance-absent-parser-plan']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_provider_receipt_cannot_hide_the_original_model_budget(self):
+        self.by_id['provider-receipt-initial']['type_dependencies'].remove(
+            self.nodes['provider-model-budget']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness|verification hypotheses'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_closed_object_receipt_cannot_drop_its_concrete_parser_plan(self):
+        self.by_id['balance-object-case-refinement']['proof_dependencies'].remove(
+            self.nodes['object-provider-plan']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_uniform_parser_family_is_instantiated_without_closing_the_general_contract(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
@@ -93,7 +137,7 @@ class FrontierPolicyTests(unittest.TestCase):
         for source, caller in [('balance-object-case-accepted', 'balance-outside-array-accepted'),
                                ('balance-object-case-safety', 'balance-outside-array-no-issue')]:
             self.assertIn({'id': caller, 'status': 'Conditional'}, result[source]['integrated_into'])
-        for node in ['balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue',
+        for node in ['balance-absent-parser-plan', 'balance-other-state-accepted', 'balance-other-input-state-safety',
                      'ignore-hyp', 'key-conditions', 'value-conditions', 'parser-call-contract']:
             self.assertEqual(result[node]['status'], 'Open')
         for node in ['balance-outside-array-accepted', 'balance-outside-array-no-issue',
@@ -101,7 +145,7 @@ class FrontierPolicyTests(unittest.TestCase):
             self.assertEqual(result[node]['status'], 'Conditional')
 
     def test_object_receipt_cannot_lose_full_model_gas_instantiation(self):
-        self.by_id['balance-object-case-refinement']['proof_dependencies'].remove(
+        self.by_id['object-provider-plan']['proof_dependencies'].remove(
             self.nodes['object-total-model-gas']['declaration'])
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
@@ -154,7 +198,7 @@ class FrontierPolicyTests(unittest.TestCase):
                       result['balance-array-case-safety']['integrated_into'])
         self.assertIn('balance-array-case-refinement',
                       result['balance-copied-case-refinement']['proof_edges'])
-        for node in ['balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue',
+        for node in ['balance-absent-parser-plan', 'balance-other-state-accepted', 'balance-other-input-state-safety',
                      'ignore-hyp', 'key-conditions', 'value-conditions']:
             self.assertEqual(result[node]['status'], 'Open')
         for node in ['balance-other-accepted', 'balance-other-no-issue', 'balance-accepted',
@@ -217,7 +261,7 @@ class FrontierPolicyTests(unittest.TestCase):
                       result['balance-end-observations']['integrated_into'])
         self.assertNotIn('balance-accepted',
                          [n['id'] for n in result['balance-entry-host']['integrated_into']])
-        for node in ['balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue', 'balance-rejected']:
+        for node in ['balance-absent-parser-plan', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-rejected']:
             self.assertEqual(result[node]['status'], 'Open')
         self.assertEqual(result['method-ft_balance_of']['status'], 'Conditional')
         self.assertEqual(result['global']['status'], 'Conditional')

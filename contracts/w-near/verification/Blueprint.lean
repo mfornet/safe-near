@@ -1425,7 +1425,7 @@ attribute [blueprint "frontier:object-entry-adequacy"
 
 attribute [blueprint "frontier:object-runs"
   (title := /-- Metered object MethodRunsR -/)
-  (statement := /-- Connects the 11-operation activation charge and actual method body to the existing two-storage-read/zero-return postcondition, for the exact code and initialized resources. -/)]
+  (statement := /-- The original object MethodRunsR statement is now a checked specialization of actual-code provider execution using the concrete object provider; activation, costs and postcondition are unchanged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.object_absent_runs
 
 attribute [blueprint "frontier:object-parser-linear-gas"
@@ -1450,7 +1450,7 @@ attribute [blueprint "frontier:object-total-model-gas"
 
 attribute [blueprint "frontier:balance-object-case-refinement"
   (title := /-- Escape-free object, absent account: receipt refinement -/)
-  (statement := /-- Proven full receipt result for initialized represented state, an unregistered account, escape-free object input up to 4 MiB, shallow ignored values and trailing whitespace only. Proves no executionIssue, sufficient-resource Matches and original gas bound, and arbitrary-resource Matches or resource failure with rollback and log prefix. Context/storage instantiate the entry, trie/proof budget and model agreement. Other input/state cases remain unresolved. -/)]
+  (statement := /-- Proven full receipt refinement for initialized represented state, an unregistered account, escape-free object input up to 4 MiB, shallow ignored values and trailing whitespace. The concrete object parser/resource/gas plan is instantiated through checked actual-code receipt composition. Original observations and gas are unchanged; other cases remain unresolved. -/)]
   WNear.Binary.BalanceOf297AbsentCall.object_absent_refines_init
 
 attribute [blueprint "frontier:balance-object-case-accepted"
@@ -1465,13 +1465,13 @@ attribute [blueprint "frontier:balance-object-case-safety"
 
 attribute [blueprint "frontier:balance-outside-array-object-no-issue"
   (title := /-- ft_balance_of: safety outside completed array/object cases -/)
-  (statement := /-- Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open. -/)
+  (statement := /-- Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation
 
 attribute [blueprint "frontier:balance-outside-array-object-accepted"
   (title := /-- ft_balance_of: accepted outside completed array/object cases -/)
-  (statement := /-- Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open. -/)
+  (statement := /-- Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation
 
@@ -1516,3 +1516,109 @@ attribute [blueprint "frontier:object-parser-family-instance"
   (statement := /-- The escape-free object parser supplies the uniform family for its explicit shallow-ignore/trailing-whitespace domain, with exact parser cost and free-list bound max F 1 + 1. This is an input-restricted instance, not discharge of the general parser family. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectNoEsc.parser_family
+
+attribute [blueprint "frontier:provider-initial-store"
+  (title := /-- Initial store retains the full parser code context -/)
+  (statement := /-- Persists the actual instantiated function cells, instance and memory limit before carving memory once. Supplies the full source code context together with the existing body code, frame, statics and host resources. -/)]
+  WNear.Binary.InitialState.startRes297Provider
+
+attribute [blueprint "frontier:object-parser-code-context"
+  (title := /-- Actual source code supplies the concrete object parser -/)
+  (statement := /-- Extracts the concrete object parser code from the full instantiated code context, using checked parser/return function-cell projections and the ignored-reader code. -/)]
+  WNear.Binary.SerdeObjectNoEsc.parser_code_of_context
+
+attribute [blueprint "frontier:parser-family-code-transport"
+  (title := /-- Parser family follows checked code entailment -/)
+  (statement := /-- Transports the exact parser family along an Iris entailment between persistent code contexts. The parser-family premise remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_family_mono
+
+attribute [blueprint "frontier:deployed-parser-provider"
+  (title := /-- Parser provider over the actual deployed code context -/)
+  (statement := /-- Uniform successful parser family over every initial host state and actual proof-model instance, with code supplied by funcCells in wStore. Parser gas and returned free-list bound are explicit. General accepted inputs still need a concrete instance. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider
+
+attribute [blueprint "frontier:object-deployed-parser-provider"
+  (title := /-- Object parser supplies the actual-code provider -/)
+  (statement := /-- Concrete escape-free/shallow-object provider, transported from the checked object family to the whole instantiated code context for every entry host state. The output is an input-restricted provider instance. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.deployed_parser_provider
+
+attribute [blueprint "frontier:provider-initial-body"
+  (title := /-- Provider body closes input allocation room -/)
+  (statement := /-- Derives RegOk from actual initial memory and positive bounded input, then composes the full provider-based body. The precise uniform parser family remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_absent_body_initial_resources
+
+attribute [blueprint "frontier:provider-entry-adequacy"
+  (title := /-- Actual-code provider entry adequacy -/)
+  (statement := /-- Adequacy from the complete actual initialized store. The store retains the full parser code context, and the body consumes the exact family at its actual input allocation state. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_absent_adequate
+
+attribute [blueprint "frontier:provider-runs"
+  (title := /-- Actual-code provider metered MethodRunsR -/)
+  (statement := /-- Composes the actual eleven-operation activation charge, entry adequacy and the two-read/zero-return postcondition. Uniform actual-code parser execution remains a named obligation. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_absent_runs
+
+attribute [blueprint "frontier:provider-model-budget"
+  (title := /-- Whole provider execution fits the original model budget -/)
+  (statement := /-- Exact budget obligation for loading, activation and provider body, including parser cost, allocator cleanup, host input/storage/return and trie charges. The original model gas bound is unchanged. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget
+
+attribute [blueprint "frontier:provider-receipt-obligations"
+  (title := /-- Provider execution reaches complete receipt refinement -/)
+  (statement := /-- Checked safety, sufficient-resource Matches and used-gas bound, plus arbitrary-resource Matches or failure with rollback/log prefix. The actual-code provider and original model-budget obligation remain explicit; entry and model agreement are supplied by the caller. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_absent_refines_with_obligations
+
+attribute [blueprint "frontier:provider-receipt-initial"
+  (title := /-- Represented initialized state closes runtime premises -/)
+  (statement := /-- Derives the actual entry, storage/trie/proof-budget and model agreement from Context.WF and represented initialized state with an absent account. Only parser execution and its whole-method model budget remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_absent_refines_init
+
+attribute [blueprint "frontier:absent-parser-plan"
+  (title := /-- Coupled parser, resource and model-gas witness -/)
+  (statement := /-- A single parseGas/outF witness must satisfy positive input below 2^24 bytes, actual-code successful parser execution and the unchanged complete model budget. The witness is shared because the budget depends on that same parser cost/free-list bound; this is not another receipt-refinement assumption. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.AbsentParserPlan
+
+attribute [blueprint "frontier:provider-plan-receipt-obligations"
+  (title := /-- Parser plan through checked receipt composition -/)
+  (statement := /-- Consumes the exact parser/resource/gas plan and composes the completed actual-code method and receipt result. The plan remains Open unless concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_plan_refines_with_obligations
+
+attribute [blueprint "frontier:provider-plan-receipt-initial"
+  (title := /-- Parser plan closes initialized absent-account receipt -/)
+  (statement := /-- The top-level reusable receipt composition for initialized represented state and an unregistered account. Context, entry, trie/proof budget and model agreement are checked; parser/resource/gas correctness remains exactly the named plan. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_plan_refines_init
+
+attribute [blueprint "frontier:object-provider-plan"
+  (title := /-- Object parser and gas instantiate the complete plan -/)
+  (statement := /-- Supplies the shared cost/free-list witness from the actual object provider and proved complete loading/body/trie/return gas bound. Its explicit domain is escape-free objects up to 4 MiB with shallow ignored values; no general parsing obligation is discharged. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.object_provider_plan
+
+attribute [blueprint "frontier:balance-absent-parser-plan"
+  (title := /-- Accepted absent-account inputs: parser/resource/gas witness -/)
+  (statement := /-- Precise remaining input obligation outside both completed array and object cases: for accepted input, represented initialized state and an unregistered account, construct the same bounded-input/parser/free-list/gas plan consumed by checked receipt composition. Protocol/domain, escaped/nested parsing and its concrete budget remain unresolved. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_absent_parser_plan_obligation
+
+attribute [blueprint "frontier:balance-other-state-accepted"
+  (title := /-- Accepted calls outside initialized absent-account state -/)
+  (statement := /-- Exact complementary accepted-input/state obligation after excluding every initialized/unregistered-account call as well as both completed cases. Registered/uninitialized behavior remains Open. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_other_state_accepted_obligation
+
+attribute [blueprint "frontier:balance-other-input-state-safety"
+  (title := /-- Safety outside accepted initialized absent-account calls -/)
+  (statement := /-- Exact safety complement: excludes every accepted initialized/unregistered-account context and both completed cases. Rejected input, registered/uninitialized states and remaining safety behavior stay Open. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_other_input_state_no_issue_obligation
