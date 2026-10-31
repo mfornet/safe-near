@@ -177,6 +177,7 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(driver.main(argv + ["run"]), 0)  # nothing left to run
         table = driver.summarize(self.root)
         self.assertEqual([(k, m, n, ok) for k, m, n, ok, _, _ in table], [("lean-proof", "a:m1", 1, 1)])
+        self.assertEqual(driver.main(argv + ["run", "--again", "--dry-run"]), 0)
         self.assertEqual(driver.main(argv + ["status"]), 0)
         self.assertEqual(driver.main(argv + ["results"]), 0)
         self.assertEqual(driver.main(argv + ["new", "t2", "--role", "runner", "--kind", "report", "--title", "x"]), 0)

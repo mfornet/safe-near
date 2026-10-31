@@ -111,10 +111,15 @@ the shared `.git` serializes commits.
 
 ## Limits
 
-- CLI agents run with permissions bypassed inside their worktree. Nothing
-  stops a misbehaving agent from touching another path; the file guard rejects
-  the result, it does not prevent the edit. Run the driver on a machine whose
-  checkouts you can rebuild.
+- CLI agents run with least privilege, not none: Claude with
+  `permission_mode` `acceptEdits` and the backend's `allowed_tools` (editing,
+  Lake, the repository's Python tools, read-only git; a tool outside the list
+  is denied, since `-p` cannot ask), Codex in its `workspace-write` sandbox.
+  Both are settings of the backend in `profiles.json`. Edits are still
+  confined only by the file guard, which rejects the result rather than
+  preventing the edit, so run the driver on a machine whose checkouts you can
+  rebuild. `run --dry-run` prints each task's tier chain and the exact brief
+  without running anything.
 - Exhaustion detection is textual for the CLIs: if a CLI changes its message,
   add the new text to `exhausted_patterns`. A backend that fails for another
   reason is retried like any failure, not marked.

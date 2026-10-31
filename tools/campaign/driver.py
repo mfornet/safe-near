@@ -242,6 +242,15 @@ def cmd_run(args, root: Path) -> int:
         print("nothing to run")
         return 0
     pool = {name: backends_module.make(name, spec) for name, spec in config.backends.items()}
+    if args.dry_run:
+        exhausted = ExhaustionState(root / "campaign/.state/exhausted.json").active()
+        for task in tasks:
+            chain = config.chain(task["role"], profile, exhausted)
+            print(f"== {task['id']} ({task['role']}): " + " -> ".join(f"{t.label} x{t.attempts}" for t in chain))
+            agentic = pool[chain[0].backend].agentic if chain else True
+            for message in messages_for(root, task, root, agentic, []):
+                print(f"--- {message['role']}\n{message['content']}")
+        return 0
     print(f"profile {profile}: {len(tasks)} task(s), {args.parallel} in parallel")
     accepted = 0
     with ThreadPoolExecutor(max_workers=args.parallel) as executor:
@@ -375,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--task", action="append", help="only this task; repeatable")
     run.add_argument("--again", action="store_true", help="rerun tasks already accepted")
     run.add_argument("--keep", action="store_true", help="keep the worktrees")
+    run.add_argument("--dry-run", action="store_true", help="print each task's tier chain and brief; run nothing")
     run.add_argument("--warm-from", type=Path, help="checkout whose .lake builds warm the worktrees (default: this one)")
     commands.add_parser("status", help="each task's state")
     commands.add_parser("results", help="success rate per task kind and model")

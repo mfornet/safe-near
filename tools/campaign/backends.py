@@ -27,6 +27,11 @@ import urllib.request
 
 FILE_BLOCK = re.compile(r"<<<FILE (?P<path>[^\n>]+)>>>\n(?P<body>.*?)\n?<<<END>>>", re.S)
 API_KEY_VARS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+# What a proof task needs: reading and editing the tree, Lake, the repository's Python
+# tools, and read-only git. No network, no package installs, no git writes.
+DEFAULT_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash(lake *)", "Bash(python3 *)",
+                        "Bash(just *)", "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)",
+                        "Bash(ls *)", "Bash(cat *)", "Bash(grep *)", "Bash(wc *)", "Bash(head *)", "Bash(tail *)"]
 
 
 @dataclass
@@ -95,7 +100,14 @@ class ClaudeCli(Backend):
         return False, "not logged in"
 
     def run(self, messages, workdir, model, timeout):
-        command = ["claude", "-p", "--output-format", "json", "--permission-mode", "bypassPermissions"]
+        # Least privilege by default: edits are accepted, and only the listed tools run
+        # without a prompt. A prompt in `-p` mode is a denial, so the allowlist is what the
+        # agent can use (`permission_mode` and `allowed_tools` in the backend's spec).
+        command = ["claude", "-p", "--output-format", "json",
+                   "--permission-mode", self.spec.get("permission_mode", "acceptEdits")]
+        tools = self.spec.get("allowed_tools", DEFAULT_CLAUDE_TOOLS)
+        if tools:
+            command += ["--allowedTools", *tools]
         if model:
             command += ["--model", model]
         started = time.monotonic()
@@ -129,8 +141,8 @@ class CodexCli(Backend):
 
     def run(self, messages, workdir, model, timeout):
         last = workdir / ".campaign-last-message.txt"
-        command = ["codex", "exec", "-C", str(workdir), "-s", "workspace-write", "--ephemeral",
-                   "--skip-git-repo-check", "--json", "-o", str(last)]
+        command = ["codex", "exec", "-C", str(workdir), "-s", self.spec.get("sandbox", "workspace-write"),
+                   "--ephemeral", "--skip-git-repo-check", "--json", "-o", str(last)]
         if model:
             command += ["-m", model]
         command.append("-")
