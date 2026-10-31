@@ -7885,6 +7885,263 @@ def WNear.Binary.ScratchGrow.roomRes (hl maxP : ℕ) (cap len k : UInt32) : Prop
     WNear.Binary.VecFromElem.roomFor hl maxP (WNear.Binary.VecGrow.growCap cap (len + k))
 ```
 
+## Bridge.Functions.ScratchReuseTrace
+
+`WNear.Binary.ScratchReuseTrace.Batches` (hash `429821ae470c3c9b`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.Batches : Type :=
+  List (List UInt32)
+```
+
+`WNear.Binary.ScratchReuseTrace.Valid` (hash `16be19f81697c254`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.Valid (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → Prop :=
+  fun x =>
+    List.brecOn (motive := fun x => UInt32 → Prop) x WNear.Binary.ScratchReuseTrace.Valid._f cap
+```
+
+`WNear.Binary.ScratchReuseTrace.allocatedBytes` (hash `4173f034918fd002`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.allocatedBytes (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => UInt32 → ℕ) x WNear.Binary.ScratchReuseTrace.allocatedBytes._f
+      cap
+```
+
+`WNear.Binary.ScratchReuseTrace.allocatedBytes_capacity` (hash `000000002850536c`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.allocatedBytes_capacity (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchReuseTrace.allocatedBytes cap batches + 2 * cap.toNat ≤
+    2 * (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchReuseTrace.allocatedBytes_peak` (hash `00000000ae0b7eeb`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.allocatedBytes_peak (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchReuseTrace.allocatedBytes cap batches ≤ 4 * WNear.Binary.ScratchReuseTrace.peak cap batches + 16
+```
+
+`WNear.Binary.ScratchReuseTrace.budget` (hash `78d5939edd9307e7`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.budget (cfg : Wasm.Near.WasmConfig) (F G P : ℕ) : ℕ :=
+  (1790 * G + (F * G + G * G - G) * 320 + 18 * (2 * P + 8)) * cfg.regularOpCost +
+      G * cfg.linearOpBaseCost +
+    cfg.linearOpUnitCost * ((4 * P + 16 + 66066 * G) / 65536)
+```
+
+`WNear.Binary.ScratchReuseTrace.budget_mono_peak` (hash `000000003bb568bd`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.budget_mono_peak (cfg : Wasm.Near.WasmConfig) (F G P Q : ℕ) (hp : P ≤ Q) :
+  WNear.Binary.ScratchReuseTrace.budget cfg F G P ≤ WNear.Binary.ScratchReuseTrace.budget cfg F G Q
+```
+
+`WNear.Binary.ScratchReuseTrace.endCap` (hash `69c417f88bd8b83b`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.endCap (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → UInt32 :=
+  fun x =>
+    List.brecOn (motive := fun x => UInt32 → UInt32) x WNear.Binary.ScratchReuseTrace.endCap._f
+      cap
+```
+
+`WNear.Binary.ScratchReuseTrace.endCap_capacity` (hash `000000000495ec1f`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.endCap_capacity (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat ≤
+    max cap.toNat (2 * WNear.Binary.ScratchReuseTrace.peak cap batches + 8)
+```
+
+`WNear.Binary.ScratchReuseTrace.endCap_strict` (hash `00000000c12f265c`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.endCap_strict (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches)
+  (hg : 0 < WNear.Binary.ScratchReuseTrace.growthCount cap batches) :
+  cap.toNat < (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchReuseTrace.endFreeBound` (hash `89aaef7ab2ea4ad4`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.endFreeBound (F : ℕ) (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => ℕ → UInt32 → ℕ) x
+      WNear.Binary.ScratchReuseTrace.endFreeBound._f F cap
+```
+
+`WNear.Binary.ScratchReuseTrace.endFreeBound_eq` (hash `000000007c006746`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.endFreeBound_eq (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchReuseTrace.Batches) :
+  WNear.Binary.ScratchReuseTrace.endFreeBound F cap batches =
+    F + 2 * WNear.Binary.ScratchReuseTrace.growthCount cap batches
+```
+
+`WNear.Binary.ScratchReuseTrace.extraCost` (hash `458910930030e6a6`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.extraCost (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) :
+  WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => ℕ → UInt32 → ℕ) x
+      (WNear.Binary.ScratchReuseTrace.extraCost._f cfg) F cap
+```
+
+`WNear.Binary.ScratchReuseTrace.extraCost_budget` (hash `000000005d47fc28`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.extraCost_budget (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchReuseTrace.Batches) (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchReuseTrace.extraCost cfg F cap batches ≤
+    WNear.Binary.ScratchReuseTrace.budget cfg F (WNear.Binary.ScratchReuseTrace.growthCount cap batches)
+      (WNear.Binary.ScratchReuseTrace.peak cap batches)
+```
+
+`WNear.Binary.ScratchReuseTrace.extraCost_le` (hash `0000000080353191`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.extraCost_le (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchReuseTrace.Batches) :
+  WNear.Binary.ScratchReuseTrace.extraCost cfg F cap batches ≤
+    (1790 * WNear.Binary.ScratchReuseTrace.growthCount cap batches +
+              WNear.Binary.ScratchReuseTrace.walks F cap batches * 320 +
+            18 * WNear.Binary.ScratchReuseTrace.movedBytes cap batches) *
+          cfg.regularOpCost +
+        WNear.Binary.ScratchReuseTrace.growthCount cap batches * cfg.linearOpBaseCost +
+      cfg.linearOpUnitCost * WNear.Binary.ScratchReuseTrace.pages cap batches
+```
+
+`WNear.Binary.ScratchReuseTrace.growthCount` (hash `fcc911aeedfe8dce`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.growthCount (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => UInt32 → ℕ) x WNear.Binary.ScratchReuseTrace.growthCount._f
+      cap
+```
+
+`WNear.Binary.ScratchReuseTrace.growthCount_doubles` (hash `000000007f2b9d83`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.growthCount_doubles (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  cap.toNat * 2 ^ WNear.Binary.ScratchReuseTrace.growthCount cap batches ≤
+    (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchReuseTrace.growthCount_peak` (hash `0000000052e53a28`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.growthCount_peak (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchReuseTrace.growthCount cap batches = 0 ∨
+    8 * 2 ^ (WNear.Binary.ScratchReuseTrace.growthCount cap batches - 1) ≤
+      2 * WNear.Binary.ScratchReuseTrace.peak cap batches + 8
+```
+
+`WNear.Binary.ScratchReuseTrace.growthCount_power` (hash `0000000068b61e9f`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.growthCount_power (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches)
+  (hg : 0 < WNear.Binary.ScratchReuseTrace.growthCount cap batches) :
+  8 * 2 ^ (WNear.Binary.ScratchReuseTrace.growthCount cap batches - 1) ≤
+    (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchReuseTrace.movedBytes` (hash `c9bc945a1ac6f9db`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.movedBytes (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => UInt32 → ℕ) x WNear.Binary.ScratchReuseTrace.movedBytes._f cap
+```
+
+`WNear.Binary.ScratchReuseTrace.movedBytes_capacity` (hash `000000008904de05`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.movedBytes_capacity (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchReuseTrace.movedBytes cap batches + cap.toNat ≤
+    (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchReuseTrace.movedBytes_peak` (hash `0000000033fdce96`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.movedBytes_peak (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchReuseTrace.movedBytes cap batches ≤ 2 * WNear.Binary.ScratchReuseTrace.peak cap batches + 8
+```
+
+`WNear.Binary.ScratchReuseTrace.next` (hash `c1e0e3eea8c1024e`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.next (cap : UInt32) (ks : List UInt32) : UInt32 :=
+  (WNear.Binary.ScratchGrow.endState cap 0 ks).1
+```
+
+`WNear.Binary.ScratchReuseTrace.pages` (hash `3ecfafb637ee42f5`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.pages (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x => List.brecOn (motive := fun x => UInt32 → ℕ) x WNear.Binary.ScratchReuseTrace.pages._f cap
+```
+
+`WNear.Binary.ScratchReuseTrace.pages_scaled` (hash `0000000087442069`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.pages_scaled (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  65536 * WNear.Binary.ScratchReuseTrace.pages cap batches ≤
+    WNear.Binary.ScratchReuseTrace.allocatedBytes cap batches +
+      66066 * WNear.Binary.ScratchReuseTrace.growthCount cap batches
+```
+
+`WNear.Binary.ScratchReuseTrace.peak` (hash `6746b27737c43050`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.peak (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x => List.brecOn (motive := fun x => UInt32 → ℕ) x WNear.Binary.ScratchReuseTrace.peak._f cap
+```
+
+`WNear.Binary.ScratchReuseTrace.valid_cap` (hash `00000000af8960e5`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.valid_cap (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) : cap.toNat < 2 ^ 28
+```
+
+`WNear.Binary.ScratchReuseTrace.walks` (hash `62e7d42ee6313cbd`)
+
+```lean
+def WNear.Binary.ScratchReuseTrace.walks (F : ℕ) (cap : UInt32) : WNear.Binary.ScratchReuseTrace.Batches → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => ℕ → UInt32 → ℕ) x WNear.Binary.ScratchReuseTrace.walks._f F
+      cap
+```
+
+`WNear.Binary.ScratchReuseTrace.walks_eq` (hash `00000000d63b3958`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.walks_eq (F : ℕ) (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches) :
+  WNear.Binary.ScratchReuseTrace.walks F cap batches + WNear.Binary.ScratchReuseTrace.growthCount cap batches =
+    F * WNear.Binary.ScratchReuseTrace.growthCount cap batches +
+      WNear.Binary.ScratchReuseTrace.growthCount cap batches * WNear.Binary.ScratchReuseTrace.growthCount cap batches
+```
+
 ## Bridge.Functions.SerdeFromTraitModel
 
 `WNear.Binary.SerdeFromTraitModel.f66_arr_model` (hash `000000004f15011a`)
@@ -7975,6 +8232,228 @@ theorem WNear.Binary.SerdeIgnReuse.ignoreHyp {GF : Iris.BundledGFunctors} [WasmL
   WNear.Binary.SerdeStructObjState.IgnoreHyp cfg lim inst mi n g Cg gt de ptr bs WNear.IgnoreShallow.ign1R
     (WNear.Binary.SerdeIgnReuse.cost81 cfg bs)
     (WNear.Binary.SerdeStructObjKeyState.member n maxP ta (A 578) idx de live B Bsaved) Cd
+```
+
+## Bridge.Functions.SerdeKeyArgumentGas
+
+`WNear.Binary.SerdeKeyEsc.consumed` (hash `5d9cd3d856ca1ef8`)
+
+```lean
+def WNear.Binary.SerdeKeyEsc.consumed (bs : List UInt8) : List WNear.Binary.SerdeKeyEsc.KeySample → ℕ :=
+  fun x => List.brecOn x (WNear.Binary.SerdeKeyEsc.consumed._f bs)
+```
+
+`WNear.Binary.SerdeKeyEsc.keyBatches_growthCount_v86` (hash `0000000005673969`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.keyBatches_growthCount_v86 (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length ≤ 4194304) (hcap : cap.toNat < 2 ^ 28)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.ScratchReuseTrace.growthCount cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys) ≤ 21
+```
+
+`WNear.Binary.SerdeKeyEsc.keyBatches_peak_consumed` (hash `000000003b751e08`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.keyBatches_peak_consumed (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 28)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.ScratchReuseTrace.peak cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys) ≤
+    WNear.Binary.SerdeKeyEsc.consumed bs keys
+```
+
+`WNear.Binary.SerdeKeyEsc.reserve_budget_v86` (hash `00000000dfbc3afb`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.reserve_budget_v86 (cfg : Wasm.Near.RuntimeConfig)
+  (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 cfg) (G P : ℕ) (hg : G ≤ 21) :
+  WNear.Binary.ScratchReuseTrace.budget cfg.wasm 1 G P ≤ 200000000000 + 37 * 822756 * P
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesCost_argument_gas` (hash `00000000c1cf22c4`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.seriesCost_argument_gas (cfg : Wasm.Near.RuntimeConfig)
+  (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 cfg) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length ≤ 4194304)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.SerdeKeyEsc.seriesCost cfg.wasm 1 0 bs keys ≤
+    200000000000 + WNear.argumentByteGas * (WNear.Binary.SerdeKeyEsc.consumed bs keys + 2 * keys.length)
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesCost_argument_slice` (hash `000000007cceaa4d`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.seriesCost_argument_slice (cfg : Wasm.Near.RuntimeConfig)
+  (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 cfg) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length ≤ 4194304)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.SerdeKeyEsc.seriesCost cfg.wasm 1 0 bs keys ≤
+    200000000000 + 400000000 * (WNear.Binary.SerdeKeyEsc.consumed bs keys + 2 * keys.length)
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesWork_eq` (hash `00000000724d4bce`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.seriesWork_eq (bs : List UInt8) (keys : List WNear.Binary.SerdeKeyEsc.KeySample) :
+  WNear.Binary.SerdeKeyEsc.seriesWork bs keys = 500 * keys.length + 433 * WNear.Binary.SerdeKeyEsc.consumed bs keys
+```
+
+## Bridge.Functions.SerdeKeyEsc
+
+`WNear.Binary.SerdeKeyEsc.f646_key_traced` (hash `000000002a0597f7`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.f646_key_traced {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 30 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp de ptr idx ptrS capS : UInt32) (ob bs : List UInt8) (q maxP hl F : ℕ) (live : List (ℕ × ℕ)) (key : String)
+  (rest : List UInt8) (hob : ob.length = 16) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hde : de.toNat + 24 ≤ 2 ^ 32) (hsp : 208 ≤ sp.toNat) (hq : q ≤ bs.length) (hcap : capS.toNat < 2 ^ 25)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP hl capS [] (List.drop q bs))
+  (hmodel : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest)) :
+  WNear.Binary.ParseStr.code646 n maxP inst mi A ⊢
+    WNear.Binary.SerdeNextKey.Spec646 cfg lim d inst mi n g Cg gt sp de ptr ob bs q key.toUTF8.toList
+      iprop(WNear.Binary.VecFromElem.stk n (sp.toNat - 208) 32 ∗
+          WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+            WNear.Binary.SerdeValueState.tables n ∗
+              n ↦[wms][ de.toNat + 12 ] WasmLogic.bytes32 ptrS ∗
+                n ↦[wms][ de.toNat + 16 ] WasmLogic.bytes32 capS ∗
+                  WNear.Binary.ScratchGrow.sbuf n maxP hl live F ptrS capS [])
+      (WNear.Binary.SerdeKeyEsc.tracedCost cfg F capS bs q)
+      iprop(WNear.Binary.VecFromElem.stk n (sp.toNat - 208) 32 ∗
+          WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+            WNear.Binary.SerdeValueState.tables n ∗
+              WNear.Binary.SerdeKeyEsc.keyState n maxP hl live F de ptr ptrS capS bs key.toUTF8.toList rest q)
+```
+
+`WNear.Binary.SerdeKeyEsc.tracedCost` (hash `e3dc07d27b443e0b`)
+
+```lean
+def WNear.Binary.SerdeKeyEsc.tracedCost (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8) (q : ℕ) : ℕ :=
+  WNear.Binary.ParseStrSuccess.costRun cfg F cap [] (List.drop q bs) bs.length +
+    100 * cfg.regularOpCost
+```
+
+`WNear.Binary.SerdeKeyEsc.tracedCost_le_keyCost` (hash `000000005de25668`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.tracedCost_le_keyCost (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8)
+  (q : ℕ) (key : String) (rest : List UInt8) (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 25)
+  (hmodel : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest)) :
+  WNear.Binary.SerdeKeyEsc.tracedCost cfg F cap bs q ≤
+    WNear.Binary.SerdeKeyEsc.keyCost cfg F cap bs key.toUTF8.toList rest q
+```
+
+## Bridge.Functions.SerdeKeyTraceCost
+
+`WNear.Binary.SerdeKeyEsc.KeySample` (hash `50c5c1e8220c4242`)
+
+```lean
+def WNear.Binary.SerdeKeyEsc.KeySample : Type :=
+  ℕ × String × List UInt8
+```
+
+`WNear.Binary.SerdeKeyEsc.keyBatches` (hash `2dde78026ee4fff9`)
+
+```lean
+def WNear.Binary.SerdeKeyEsc.keyBatches (bs : List UInt8) (keys : List WNear.Binary.SerdeKeyEsc.KeySample) :
+  WNear.Binary.ScratchReuseTrace.Batches :=
+  List.map (fun k => WNear.Binary.ParseStrSuccess.appendChunks (List.drop k.1 bs) []) keys
+```
+
+`WNear.Binary.SerdeKeyEsc.keyBatches_growthCount` (hash `00000000ebac36ea`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.keyBatches_growthCount (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 28)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.ScratchReuseTrace.growthCount cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys) = 0 ∨
+    8 * 2 ^ (WNear.Binary.ScratchReuseTrace.growthCount cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys) - 1) ≤
+      2 * bs.length + 8
+```
+
+`WNear.Binary.SerdeKeyEsc.keyBatches_peak` (hash `00000000fcc678a4`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.keyBatches_peak (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 28)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.ScratchReuseTrace.peak cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys) ≤ bs.length
+```
+
+`WNear.Binary.SerdeKeyEsc.keyBatches_valid` (hash `000000009db9e536`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.keyBatches_valid (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 28)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.ScratchReuseTrace.Valid cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys)
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesCost` (hash `7f4e2240d45dda2a`)
+
+```lean
+def WNear.Binary.SerdeKeyEsc.seriesCost (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8) :
+  List WNear.Binary.SerdeKeyEsc.KeySample → ℕ :=
+  fun x =>
+    List.brecOn (motive := fun x => ℕ → UInt32 → ℕ) x
+      (WNear.Binary.SerdeKeyEsc.seriesCost._f cfg bs) F cap
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesCost_budget` (hash `0000000059f7af1e`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.seriesCost_budget (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2))
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys)) :
+  WNear.Binary.SerdeKeyEsc.seriesCost cfg F cap bs keys ≤
+    WNear.Binary.SerdeKeyEsc.seriesWork bs keys * cfg.regularOpCost +
+      WNear.Binary.ScratchReuseTrace.budget cfg F
+        (WNear.Binary.ScratchReuseTrace.growthCount cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys))
+        (WNear.Binary.ScratchReuseTrace.peak cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys))
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesCost_budget_model` (hash `00000000e20b6b0a`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.seriesCost_budget_model (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 28)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.SerdeKeyEsc.seriesCost cfg F cap bs keys ≤
+    WNear.Binary.SerdeKeyEsc.seriesWork bs keys * cfg.regularOpCost +
+      WNear.Binary.ScratchReuseTrace.budget cfg F
+        (WNear.Binary.ScratchReuseTrace.growthCount cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys)) bs.length
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesCost_growth` (hash `00000000f2755916`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.seriesCost_growth (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8)
+  (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24)
+  (hmodels : ∀ k ∈ keys, NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.SerdeKeyEsc.seriesCost cfg F cap bs keys ≤
+    WNear.Binary.SerdeKeyEsc.seriesWork bs keys * cfg.regularOpCost +
+      WNear.Binary.ScratchReuseTrace.extraCost cfg F cap (WNear.Binary.SerdeKeyEsc.keyBatches bs keys)
+```
+
+`WNear.Binary.SerdeKeyEsc.seriesWork` (hash `65d86213984af491`)
+
+```lean
+def WNear.Binary.SerdeKeyEsc.seriesWork (bs : List UInt8) : List WNear.Binary.SerdeKeyEsc.KeySample → ℕ :=
+  fun x => List.brecOn x (WNear.Binary.SerdeKeyEsc.seriesWork._f bs)
+```
+
+`WNear.Binary.SerdeKeyEsc.tracedCost_growth` (hash `000000007d0a0cae`)
+
+```lean
+theorem WNear.Binary.SerdeKeyEsc.tracedCost_growth (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (bs : List UInt8)
+  (k : WNear.Binary.SerdeKeyEsc.KeySample) (hlen : bs.length < 2 ^ 24)
+  (hmodel : NearInterface.Json.stringBody (List.drop k.1 bs) [] = some (some k.2.1, k.2.2)) :
+  WNear.Binary.SerdeKeyEsc.tracedCost cfg F cap bs k.1 ≤
+    (500 + 433 * ((List.drop k.1 bs).length - k.2.2.length)) * cfg.regularOpCost +
+      WNear.Binary.ScratchGrow.extraCost cfg F cap 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop k.1 bs) [])
 ```
 
 ## Bridge.Functions.SerdeObjectNoEsc
@@ -8962,6 +9441,32 @@ def WNear.Binary.ParseStr.roomRun (maxP hl : ℕ) (cap : UInt32) (acc l : List U
   WNear.Binary.ParseStr.roomRun._unary maxP ⟨hl, ⟨cap, ⟨acc, l⟩⟩⟩
 ```
 
+## Bridge.Functions.StrGrowthSharp
+
+`WNear.Binary.ParseStrSuccess.costRun_growth_sharp` (hash `0000000045ab094d`)
+
+```lean
+theorem WNear.Binary.ParseStrSuccess.costRun_growth_sharp (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (acc l bytes rest : List UInt8) (L : ℕ)
+  (hok : WNear.Binary.ParseStr.strRun l acc = WNear.Binary.ParseStr.StrOut.ok bytes rest)
+  (hsmall : acc.length + l.length < 2 ^ 27) :
+  rest.length < l.length ∧
+    WNear.Binary.ParseStrSuccess.costRun cfg F cap acc l L ≤
+      (400 + 433 * (l.length - rest.length) + 100 * acc.length) * cfg.regularOpCost +
+        WNear.Binary.ScratchGrow.extraCost cfg F cap (UInt32.ofNat acc.length)
+          (WNear.Binary.ParseStrSuccess.appendChunks l acc)
+```
+
+`WNear.Binary.ParseStrSuccess.escape_growth_charge_sharp` (hash `00000000fdeac1dc`)
+
+```lean
+theorem WNear.Binary.ParseStrSuccess.escape_growth_charge_sharp (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (acc l out : List UInt8) (m : ℕ) (he : WNear.Binary.ParseEscape.escDecode l = some (out, m)) :
+  (486 + 100 * out.length) * cfg.regularOpCost + WNear.Binary.ParseEscapeFast.cost649 cfg F cap acc l ≤
+    433 * (m + 1) * cfg.regularOpCost +
+      WNear.Binary.ScratchGrow.extraStep cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat out.length)
+```
+
 ## Bridge.Functions.StrRoom
 
 `WNear.Binary.ParseStrRoom.roomRun_of_short_stringBody` (hash `0000000080282d01`)
@@ -9002,6 +9507,54 @@ def WNear.Binary.VecFromElem.roomFor (len maxP : ℕ) (size : UInt32) : Prop :=
                 65536) /
             65536 ≤
           maxP
+```
+
+## Bridge.Methods.AcceptedInputBounds
+
+`WNear.Binary.BalanceOf297AbsentCall.absent_plan_of_parser_cost` (hash `000000007082505b`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.absent_plan_of_parser_cost (cfg : WNear.Config) (size : ℕ) (raw : WNear.RawStorage)
+  (modelSt : Option WNear.State) (ctx : NearInterface.Context) (S : WNear.State) (a : WNear.AccountId)
+  (hwf : ctx.WF raw) (hm : ctx.method = "ft_balance_of")
+  (hp : (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a))
+  (hl : WNear.Binary.InputDomain.ArgumentLimitV86 ctx.protocol)
+  (hcost :
+    ∃ parseGas outF,
+      WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
+        WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg size raw modelSt ctx S a parseGas outF) :
+  WNear.Binary.BalanceOf297AbsentCall.AbsentParserPlan cfg size raw modelSt ctx S a ctx.args
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.accepted_balance_input_nonempty` (hash `00000000f4cfcf95`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.accepted_balance_input_nonempty (cfg : WNear.Config) (ctx : NearInterface.Context)
+  (c : WNear.Call) (hm : ctx.method = "ft_balance_of") (hp : (WNear.wnear cfg).Parses ctx.method ctx.args c) :
+  0 < List.length ctx.args
+```
+
+`WNear.Binary.InputDomain.ArgumentLimitV86` (hash `454a6cb7602c8dc2`)
+
+```lean
+def WNear.Binary.InputDomain.ArgumentLimitV86 (protocol : Wasm.Near.RuntimeConfig) : Prop :=
+  protocol.wasm.limits.maxArgumentsLength ≤ 4194304
+```
+
+`WNear.Binary.InputDomain.accepted_balance_input_bounds` (hash `0000000000c92931`)
+
+```lean
+theorem WNear.Binary.InputDomain.accepted_balance_input_bounds (cfg : WNear.Config) (ctx : NearInterface.Context)
+  (raw : WNear.RawStorage) (c : WNear.Call) (hwf : ctx.WF raw) (hm : ctx.method = "ft_balance_of")
+  (hp : (WNear.wnear cfg).Parses ctx.method ctx.args c) (hl : WNear.Binary.InputDomain.ArgumentLimitV86 ctx.protocol) :
+  0 < List.length ctx.args ∧ List.length ctx.args < 2 ^ 24
+```
+
+`WNear.Binary.InputDomain.wf_arguments_small` (hash `00000000cd38a6ec`)
+
+```lean
+theorem WNear.Binary.InputDomain.wf_arguments_small (ctx : NearInterface.Context) (raw : WNear.RawStorage) (hwf : ctx.WF raw)
+  (hl : WNear.Binary.InputDomain.ArgumentLimitV86 ctx.protocol) : List.length ctx.args ≤ 4194304
 ```
 
 ## Bridge.Methods.Code297
@@ -12576,6 +13129,15 @@ theorem WNear.Binary.InitialState.startRes297Provider_gen {GF : Iris.BundledGFun
                                       0 ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes)
 ```
 
+## Model.Contract
+
+`WNear.argumentByteGas` (hash `f384b759c79049ef`)
+
+```lean
+def WNear.argumentByteGas : ℕ :=
+  400 * 10 ^ 6
+```
+
 ## NearInterface.Boundary
 
 `NearInterface.Context.WF` (hash `3c54348dc29aaf11`)
@@ -12991,6 +13553,24 @@ def WNear.PinnedProtocolAvailable : Prop :=
 theorem WNear.deployed_code_size : WNear.Binary.wNearBytes.size ≤ 185625
 ```
 
+`WNear.ftBalanceOf_absent_parser_cost_obligation` (hash `00000000ddc7e632`)
+
+```lean
+theorem WNear.ftBalanceOf_absent_parser_cost_obligation (cfg : WNear.Config) (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage)
+  (ctx : NearInterface.Context) (S : WNear.State) (a : WNear.AccountId)
+  (hrep : (WNear.wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw) (hctx : ctx.protocol = protocol)
+  (hm : ctx.method = "ft_balance_of") (hparse : (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a))
+  (ha : a ∉ S.registered)
+  (hother : ¬WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase (some S) ctx (WNear.Call.ftBalanceOf a))
+  (hobject : ¬WNear.Binary.BalanceOf297AbsentCall.ObjectAbsentCase (some S) ctx (WNear.Call.ftBalanceOf a)) :
+  ∃ parseGas outF,
+    WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
+      WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg WNear.Binary.wNearBytes.size raw (some S) ctx S a
+        parseGas outF
+```
+
 `WNear.ftBalanceOf_absent_parser_plan_obligation` (hash `00000000bd88df2c`)
 
 ```lean
@@ -13244,6 +13824,14 @@ theorem WNear.nearWithdraw_obligation (cfg : WNear.Config) (codeOf : List UInt8 
   (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
   (he : WNear.Binary.Exported.Environment protocol) :
   WNear.Binary.Exported.MethodClause cfg WNear.Binary.wNearBytes.size codeOf protocol "near_withdraw"
+```
+
+`WNear.pinned_arguments_obligation` (hash `00000000bc36b530`)
+
+```lean
+theorem WNear.pinned_arguments_obligation (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol) :
+  WNear.Binary.InputDomain.ArgumentLimitV86 protocol
 ```
 
 `WNear.pinned_costs_obligation` (hash `000000000b377d6a`)

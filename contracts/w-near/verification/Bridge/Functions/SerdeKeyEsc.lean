@@ -1,3 +1,4 @@
+import Bridge.Functions.StrGrowthSharp
 import Bridge.Functions.SerdeValueState
 import Bridge.Functions.SerdeNextKey
 
@@ -132,10 +133,13 @@ theorem result_lend (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat)
     iunfold scratchPre
     iframe S0 S4 S8 Hempty
 
+/-- Successful string-loop charge retaining segment and scratch-allocation costs. -/
+def tracedCost (cfg : WasmConfig) (F : Nat) (cap : UInt32) (bs : List UInt8) (q : Nat) : Nat :=
+  ParseStrSuccess.costRun cfg F cap [] (bs.drop q) bs.length + 100 * cfg.regularOpCost
+
 set_option maxRecDepth 100000 in
-/-- General successful keys at the existing 193/646 boundary, with changing scratch state.
-The additional 32 stack bytes travel in the abstract pre/post resources. -/
-theorem f646_key (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst)
+/-- Successful key reading before replacing segment and allocator charges by a linear envelope. -/
+theorem f646_key_traced (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst)
     (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 30 < lim.maxCallDepth)
     (Cg : Nat) (gt : GlobalType) (sp de ptr idx ptrS capS : UInt32)
     (ob bs : List UInt8) (q maxP hl F : Nat) (live : List (Nat × Nat)) (key : String) (rest : List UInt8)
@@ -148,7 +152,7 @@ theorem f646_key (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : Modu
         iprop(stk n (sp.toNat - 208) 32 ∗ vt n 1057464 idx ta (A 578) ∗ SerdeValueState.tables n ∗
           n ↦[i32][ de.toNat + 12 ] ptrS ∗ n ↦[i32][ de.toNat + 16 ] capS ∗
           sbuf n maxP hl live F ptrS capS [])
-        (keyCost cfg F capS bs key.toUTF8.toList rest q)
+        (tracedCost cfg F capS bs q)
         iprop(stk n (sp.toNat - 208) 32 ∗ vt n 1057464 idx ta (A 578) ∗ SerdeValueState.tables n ∗
           keyState n maxP hl live F de ptr ptrS capS bs key.toUTF8.toList rest q) := by
   have hlt := sp.toNat_lt
@@ -156,7 +160,7 @@ theorem f646_key (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : Modu
     rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
   have hsc : (de + 12).toNat = de.toNat + 12 := by simp [UInt32.toNat_add]; omega
   obtain ⟨hok, hu⟩ := SerdeAccountIdEsc.strRun_of_stringBody _ _ _ hmodel
-  have s := ParseStrSuccess.f646_success_growth_traced (GF := GF) cfg lim d types[31]! rfl
+  have s := ParseStrSuccess.f646_success_traced (GF := GF) cfg lim d types[31]! rfl
     inst mi A n g ta hm hd Cg gt (sp - 16) (sp - 16) de (de + 12) ptr idx ptrS capS ob bs q
     maxP hl live F hob (by omega) hlen (by omega) (by omega) (by omega) (by omega)
     hq hcap hroom key.toUTF8.toList rest hok hu
@@ -192,6 +196,52 @@ theorem f646_key (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : Modu
     iframe H32 Hvt Hstate
     iunfold SerdeValueState.tables
     iframe He Hw Hhex
+
+
+theorem tracedCost_le_keyCost (cfg : WasmConfig) (F : Nat) (cap : UInt32)
+    (bs : List UInt8) (q : Nat) (key : String) (rest : List UInt8)
+    (hlen : bs.length < 2 ^ 24) (hcap : cap.toNat < 2 ^ 25)
+    (hmodel : NearInterface.Json.stringBody (bs.drop q) [] = some (some key, rest)) :
+    tracedCost cfg F cap bs q ≤ keyCost cfg F cap bs key.toUTF8.toList rest q := by
+  obtain ⟨hok, hu⟩ := SerdeAccountIdEsc.strRun_of_stringBody _ _ _ hmodel
+  have hsmall : ([] : List UInt8).length + (bs.drop q).length < 2 ^ 27 := by simp; omega
+  have hb := (ParseStrSuccess.costRun_growth_sharp cfg F cap [] (bs.drop q) key.toUTF8.toList rest bs.length hok hsmall).2
+  have hg := ParseStrSuccess.appendChunks_growthBudget cfg F cap [] (bs.drop q) key.toUTF8.toList rest hok
+    (by simp) (by omega) hsmall
+  simp only [List.length_nil, show UInt32.ofNat 0 = (0 : UInt32) from rfl,
+    Nat.mul_zero, Nat.add_zero] at hb hg
+  have hlinear := Nat.mul_le_mul_right cfg.regularOpCost
+    (show 433 * ((bs.drop q).length - rest.length) ≤ 470 * ((bs.drop q).length - rest.length) by omega)
+  unfold tracedCost keyCost
+  simp only [Nat.add_mul] at hb ⊢
+  omega
+
+
+set_option maxRecDepth 100000 in
+/-- General successful keys at the existing 193/646 boundary, with changing scratch state.
+The additional 32 stack bytes travel in the abstract pre/post resources. -/
+theorem f646_key (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst)
+    (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 30 < lim.maxCallDepth)
+    (Cg : Nat) (gt : GlobalType) (sp de ptr idx ptrS capS : UInt32)
+    (ob bs : List UInt8) (q maxP hl F : Nat) (live : List (Nat × Nat)) (key : String) (rest : List UInt8)
+    (hob : ob.length = 16) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+    (hde : de.toNat + 24 ≤ 2 ^ 32) (hsp : 208 ≤ sp.toNat) (hq : q ≤ bs.length)
+    (hcap : capS.toNat < 2 ^ 25) (hroom : roomRun maxP hl capS [] (bs.drop q))
+    (hmodel : NearInterface.Json.stringBody (bs.drop q) [] = some (some key, rest)) :
+    code646 n maxP inst mi A ⊢
+      SerdeNextKey.Spec646 (GF := GF) cfg lim d inst mi n g Cg gt sp de ptr ob bs q key.toUTF8.toList
+        iprop(stk n (sp.toNat - 208) 32 ∗ vt n 1057464 idx ta (A 578) ∗ SerdeValueState.tables n ∗
+          n ↦[i32][ de.toNat + 12 ] ptrS ∗ n ↦[i32][ de.toNat + 16 ] capS ∗
+          sbuf n maxP hl live F ptrS capS [])
+        (keyCost cfg F capS bs key.toUTF8.toList rest q)
+        iprop(stk n (sp.toNat - 208) 32 ∗ vt n 1057464 idx ta (A 578) ∗ SerdeValueState.tables n ∗
+          keyState n maxP hl live F de ptr ptrS capS bs key.toUTF8.toList rest q) := by
+  apply (f646_key_traced cfg lim d inst mi A n g ta hm hd Cg gt sp de ptr idx ptrS capS
+    ob bs q maxP hl F live key rest hob hlen hptr hde hsp hq hcap hroom hmodel).trans
+  unfold SerdeNextKey.Spec646
+  apply AllocGen.MFunSpec_cost
+  intro args
+  exact tracedCost_le_keyCost cfg F capS bs q key rest hlen hcap hmodel
 
 set_option maxRecDepth 100000 in
 /-- The actual next-key call accepts every model-decoded key, preserving reusable grown scratch. -/

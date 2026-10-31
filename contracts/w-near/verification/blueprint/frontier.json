@@ -3605,15 +3605,18 @@
       "id": "balance-absent-parser-plan",
       "declaration": "WNear.ftBalanceOf_absent_parser_plan_obligation",
       "title": "Accepted absent-account inputs: parser/resource/gas witness",
-      "kind": "admission",
+      "kind": "theorem",
       "label": "frontier:balance-absent-parser-plan",
-      "notes": "Precise remaining input obligation outside both completed array and object cases: for accepted input, represented initialized state and an unregistered account, construct the same bounded-input/parser/free-list/gas plan consumed by checked receipt composition. Protocol/domain, escaped/nested parsing and its concrete budget remain unresolved.",
-      "required_proof_dependencies": [],
+      "notes": "Preserves the exact prior plan statement. Checked construction now proves accepted-input positivity and derives size through Context.WF plus the named pinned ceiling. Only the numerical protocol ceiling and actual parser/gas witness are admitted; every dependent assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "absent-plan-input-composition",
+        "pinned-arguments-limit",
+        "balance-absent-parser-cost"
+      ],
       "reviewed_shape_hash": 3179863852,
       "required_type_dependencies": [
         "absent-parser-plan"
-      ],
-      "indirect_admission": true
+      ]
     },
     {
       "id": "balance-other-state-accepted",
@@ -3636,6 +3639,329 @@
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 592551965,
       "indirect_admission": true
+    },
+    {
+      "id": "key-traced-reader",
+      "declaration": "WNear.Binary.SerdeKeyEsc.f646_key_traced",
+      "title": "Key reader retains segment and allocator charges",
+      "kind": "theorem",
+      "label": "frontier:key-traced-reader",
+      "notes": "Actual function-646 key handoff with the successful string-loop charge and exact scratch endpoint. Room for reachable escaped-string allocation remains explicit; no universal parser-room instance is asserted.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 705009655,
+      "required_type_dependencies": [
+        "string-room"
+      ]
+    },
+    {
+      "id": "key-traced-cost-domination",
+      "declaration": "WNear.Binary.SerdeKeyEsc.tracedCost_le_keyCost",
+      "title": "Traced key charge fits the unchanged public envelope",
+      "kind": "theorem",
+      "label": "frontier:key-traced-cost-domination",
+      "notes": "Proves the previous key charge bounds the retained segment/allocation cost for every bounded successful model key. No original key or method gas statement changes.",
+      "required_proof_dependencies": [
+        "string-work-sharp"
+      ],
+      "reviewed_shape_hash": 1575114344
+    },
+    {
+      "id": "key-growth-reader",
+      "declaration": "WNear.Binary.SerdeKeyEsc.f646_key",
+      "title": "Existing key contract specializes the traced reader",
+      "kind": "theorem",
+      "label": "frontier:key-growth-reader",
+      "notes": "Preserves the exact old key-reader statement. It is now checked composition of the traced key call and cost domination; the general escaped-string room premise remains unresolved.",
+      "required_proof_dependencies": [
+        "key-traced-reader",
+        "key-traced-cost-domination"
+      ],
+      "reviewed_shape_hash": 701205876,
+      "required_type_dependencies": [
+        "string-room"
+      ]
+    },
+    {
+      "id": "scratch-reuse-free-bound",
+      "declaration": "WNear.Binary.ScratchReuseTrace.endFreeBound_eq",
+      "title": "Scratch clears retain the evolving free-list bound",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-free-bound",
+      "notes": "Across arbitrary append batches starting with used length zero, the free-list bound is initial F plus twice the total actual growth count. Clearing never resets it.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2080401222
+    },
+    {
+      "id": "scratch-reuse-walks",
+      "declaration": "WNear.Binary.ScratchReuseTrace.walks_eq",
+      "title": "Allocator walks across reused scratch",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-walks",
+      "notes": "Exact summed allocator-walk identity across clears, retaining the initial F term and the global growth-count square. No constant free-list bound is invented.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3594205528
+    },
+    {
+      "id": "scratch-reuse-copying",
+      "declaration": "WNear.Binary.ScratchReuseTrace.movedBytes_peak",
+      "title": "Copying across clears is paid by peak use",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-copying",
+      "notes": "Capacity increases telescope across batches. Total old bytes copied are bounded by twice peak used length plus eight, independent of the number of clears.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 872271510
+    },
+    {
+      "id": "scratch-reuse-pages",
+      "declaration": "WNear.Binary.ScratchReuseTrace.pages_scaled",
+      "title": "Allocator page requests across reused scratch",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-pages",
+      "notes": "All page requests are bounded by allocated capacity plus per-growth rounding/header overhead. This is a pure bound under explicit arithmetic trace validity; it does not assume every reserve actually grows memory.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2269388905
+    },
+    {
+      "id": "scratch-reuse-budget",
+      "declaration": "WNear.Binary.ScratchReuseTrace.extraCost_budget",
+      "title": "Global scratch reserve budget across keys",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-budget",
+      "notes": "The complete sum of reserve charges retains changing allocator walks, copied bytes, requested pages and base/unit memory fees. The budget uses one global growth count and peak use rather than a fresh buffer at every key.",
+      "required_proof_dependencies": [
+        "scratch-reuse-walks",
+        "scratch-reuse-copying",
+        "scratch-reuse-pages"
+      ],
+      "reviewed_shape_hash": 1564998696
+    },
+    {
+      "id": "scratch-reuse-growth-power",
+      "declaration": "WNear.Binary.ScratchReuseTrace.growthCount_peak",
+      "title": "Clears do not restart geometric growth",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-growth-power",
+      "notes": "A positive global growth count has a power-of-two capacity certificate bounded by peak use. Repeated clears preserve capacity, so each key cannot be charged as a fresh geometric allocation series.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1390754344
+    },
+    {
+      "id": "key-series-growth",
+      "declaration": "WNear.Binary.SerdeKeyEsc.seriesCost_growth",
+      "title": "Successive traced key calls share scratch accounting",
+      "kind": "theorem",
+      "label": "frontier:key-series-growth",
+      "notes": "The retained key-reader cost sums to ordinary string work plus the actual globally evolving allocation reserve. This models consecutive key calls with scratch clears; it does not include account allocation or ignored-container operations.",
+      "required_proof_dependencies": [
+        "string-work-sharp"
+      ],
+      "reviewed_shape_hash": 4067776790
+    },
+    {
+      "id": "key-series-valid",
+      "declaration": "WNear.Binary.SerdeKeyEsc.keyBatches_valid",
+      "title": "Model-decoded keys discharge append-trace validity",
+      "kind": "theorem",
+      "label": "frontier:key-series-valid",
+      "notes": "Every successful model key in a bounded input supplies the arithmetic validity and capacity bound of its actual append chunks, carried from one key to the next. No trace-validity obligation is left in the model corollary.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2646205750
+    },
+    {
+      "id": "key-series-input-budget",
+      "declaration": "WNear.Binary.SerdeKeyEsc.seriesCost_budget_model",
+      "title": "Model keys supply the global reuse budget",
+      "kind": "theorem",
+      "label": "frontier:key-series-input-budget",
+      "notes": "Discharges arithmetic validity and bounds peak decoded scratch use by the whole input length. The resulting key-only cost bound retains its actual global growth count. Connecting the complete object trace and fitting the unchanged model gas remain unresolved.",
+      "required_proof_dependencies": [
+        "key-series-growth",
+        "key-series-valid",
+        "scratch-reuse-budget"
+      ],
+      "reviewed_shape_hash": 3792399114
+    },
+    {
+      "id": "key-series-growth-count",
+      "declaration": "WNear.Binary.SerdeKeyEsc.keyBatches_growthCount",
+      "title": "Model key series supplies a logarithmic growth certificate",
+      "kind": "theorem",
+      "label": "frontier:key-series-growth-count",
+      "notes": "A bounded successful model key sequence has zero growth or a global power-of-two growth certificate bounded by input length, including arbitrary intervening clears.",
+      "required_proof_dependencies": [
+        "key-series-valid",
+        "scratch-reuse-growth-power"
+      ],
+      "reviewed_shape_hash": 3953932010
+    },
+    {
+      "id": "balance-input-nonempty",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.accepted_balance_input_nonempty",
+      "title": "Every accepted balance call has nonempty input",
+      "kind": "theorem",
+      "label": "frontier:balance-input-nonempty",
+      "notes": "Kernel-checks that the model decoder rejects the empty byte list, then derives positivity for every accepted ft_balance_of call. No parser/provider or protocol hypothesis is assumed.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4107259797
+    },
+    {
+      "id": "argument-limit-v86",
+      "declaration": "WNear.Binary.InputDomain.ArgumentLimitV86",
+      "title": "Pinned argument ceiling needed by parser bounds",
+      "kind": "verification_contract",
+      "label": "frontier:argument-limit-v86",
+      "notes": "Exact numerical protocol contract: maxArgumentsLength is at most 4194304 bytes. The pinned JSON implication is separately Open; Context.WF alone does not discharge it.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4992922671741963714
+    },
+    {
+      "id": "receipt-small-arguments",
+      "declaration": "WNear.Binary.InputDomain.wf_arguments_small",
+      "title": "Reviewed receipt bound composes with the argument ceiling",
+      "kind": "theorem",
+      "label": "frontier:receipt-small-arguments",
+      "notes": "Context.WF supplies the incoming argument-length bound. The explicit protocol ceiling then bounds actual arguments by 4 MiB; that numerical protocol instance is not silently assumed.",
+      "required_proof_dependencies": [
+        "context-wf-bounded-args"
+      ],
+      "reviewed_shape_hash": 3443042028,
+      "required_type_dependencies": [
+        "argument-limit-v86"
+      ]
+    },
+    {
+      "id": "balance-accepted-input-bounds",
+      "declaration": "WNear.Binary.InputDomain.accepted_balance_input_bounds",
+      "title": "Accepted input supplies parser positivity and length",
+      "kind": "theorem",
+      "label": "frontier:balance-accepted-input-bounds",
+      "notes": "Combines proved accepted-input nonemptiness and the reviewed incoming receipt domain. Positivity is discharged; the pinned numerical ceiling remains explicit.",
+      "required_proof_dependencies": [
+        "balance-input-nonempty",
+        "receipt-small-arguments"
+      ],
+      "reviewed_shape_hash": 13183281,
+      "required_type_dependencies": [
+        "argument-limit-v86"
+      ]
+    },
+    {
+      "id": "absent-plan-input-composition",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.absent_plan_of_parser_cost",
+      "title": "Parser plan closes its input-domain components",
+      "kind": "theorem",
+      "label": "frontier:absent-plan-input-composition",
+      "notes": "Constructs the original exact parser plan from a shared provider/gas witness, proved accepted-input positivity and the explicit protocol ceiling. The provider, original model budget and pinned ceiling remain named dependencies.",
+      "required_proof_dependencies": [
+        "balance-accepted-input-bounds"
+      ],
+      "reviewed_shape_hash": 1887588443,
+      "required_type_dependencies": [
+        "argument-limit-v86",
+        "deployed-parser-provider",
+        "provider-model-budget",
+        "absent-parser-plan"
+      ]
+    },
+    {
+      "id": "pinned-arguments-limit",
+      "declaration": "WNear.pinned_arguments_obligation",
+      "title": "Pinned JSON implies the 4 MiB argument ceiling",
+      "kind": "admission",
+      "label": "frontier:pinned-arguments-limit",
+      "notes": "Precise remaining protocol field obligation. This does not provide the protocol parse witness, runtime premises or any other field proof.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3157701936,
+      "required_type_dependencies": [
+        "argument-limit-v86"
+      ],
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-absent-parser-cost",
+      "declaration": "WNear.ftBalanceOf_absent_parser_cost_obligation",
+      "title": "Accepted absent-account inputs: parser and cost witness",
+      "kind": "admission",
+      "label": "frontier:balance-absent-parser-cost",
+      "notes": "Remaining outside-case obligation is exactly one parser-cost/free-list witness satisfying actual-code execution and the unchanged whole-method budget. Input positivity is proved separately, and input size follows the explicit pinned argument-ceiling obligation.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3720865330,
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ],
+      "indirect_admission": true
+    },
+    {
+      "id": "string-escape-work-sharp",
+      "declaration": "WNear.Binary.ParseStrSuccess.escape_growth_charge_sharp",
+      "title": "Successful escapes fit 433 operations per encoded byte",
+      "kind": "theorem",
+      "label": "frontier:string-escape-work-sharp",
+      "notes": "Strengthens the existing successful-escape work bound while retaining the actual scratch reserve charge. Includes simple escapes, Unicode and surrogate pairs; no model gas change.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4260020700
+    },
+    {
+      "id": "string-work-sharp",
+      "declaration": "WNear.Binary.ParseStrSuccess.costRun_growth_sharp",
+      "title": "Successful string work sharpens 470 to 433 operations per byte",
+      "kind": "theorem",
+      "label": "frontier:string-work-sharp",
+      "notes": "Proves the stronger linear bound on the existing successful string-loop charge, including fitting appends and final UTF-8. Every actual allocation/growth cost remains in the separate evolving trace. The deployed model allowance is unchanged.",
+      "required_proof_dependencies": [
+        "string-escape-work-sharp"
+      ],
+      "reviewed_shape_hash": 1168836941
+    },
+    {
+      "id": "key-growth-count-v86",
+      "declaration": "WNear.Binary.SerdeKeyEsc.keyBatches_growthCount_v86",
+      "title": "Bounded input permits at most 21 global key-scratch growths",
+      "kind": "theorem",
+      "label": "frontier:key-growth-count-v86",
+      "notes": "Derives a concrete growth-count bound from the checked power certificate and explicit 4 MiB input size. Clears and repeated keys do not restart growth. The pinned protocol field implication remains separately Open.",
+      "required_proof_dependencies": [
+        "key-series-growth-count"
+      ],
+      "reviewed_shape_hash": 90650985
+    },
+    {
+      "id": "key-peak-consumed",
+      "declaration": "WNear.Binary.SerdeKeyEsc.keyBatches_peak_consumed",
+      "title": "Peak key scratch is paid by consumed key bytes",
+      "kind": "theorem",
+      "label": "frontier:key-peak-consumed",
+      "notes": "Successful model keys bound peak scratch use by the sum of their consumed source slices, including their closing quotes. This does not assert those slices cover the whole object input.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 997531144
+    },
+    {
+      "id": "scratch-reuse-budget-v86",
+      "declaration": "WNear.Binary.SerdeKeyEsc.reserve_budget_v86",
+      "title": "Reviewed costs close the global key reserve formula",
+      "kind": "theorem",
+      "label": "frontier:scratch-reuse-budget-v86",
+      "notes": "For initial free-list bound one and at most 21 growths, the proved reserve formula fits 200 billion gas plus 37 times the reviewed operation price per peak byte. This is the numeric reserve ceiling; full method gas remains unresolved.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3753655035
+    },
+    {
+      "id": "key-argument-slice-gas",
+      "declaration": "WNear.Binary.SerdeKeyEsc.seriesCost_argument_gas",
+      "title": "Key-only cost fits the original argument-byte allowance",
+      "kind": "theorem",
+      "label": "frontier:key-argument-slice-gas",
+      "notes": "Proves the key-only sequence is bounded by a fixed 200-billion-gas reserve plus the unchanged model argumentByteGas for consumed key bytes and two structural bytes per key. Uses actual reused capacity/free-list accounting and reviewed CostsV86. Full input coverage of this slice, account/ignored-container operations and other runtime charges remain Open.",
+      "required_proof_dependencies": [
+        "key-growth-count-v86",
+        "key-peak-consumed",
+        "scratch-reuse-budget-v86",
+        "key-series-valid",
+        "key-series-growth",
+        "scratch-reuse-budget"
+      ],
+      "reviewed_shape_hash": 3251577540
     }
   ],
   "reviewed_environment": [
@@ -3661,9 +3987,10 @@
     "WNear.storageUnregister_obligation",
     "WNear.storageBalanceOf_obligation",
     "WNear.ftBalanceOf_rejected_obligation",
-    "WNear.ftBalanceOf_absent_parser_plan_obligation",
     "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
-    "WNear.ftBalanceOf_other_state_accepted_obligation"
+    "WNear.ftBalanceOf_other_state_accepted_obligation",
+    "WNear.pinned_arguments_obligation",
+    "WNear.ftBalanceOf_absent_parser_cost_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -3694,6 +4021,8 @@
     "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
     "WNear.ftBalanceOf_absent_parser_plan_obligation",
     "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
-    "WNear.ftBalanceOf_other_state_accepted_obligation"
+    "WNear.ftBalanceOf_other_state_accepted_obligation",
+    "WNear.pinned_arguments_obligation",
+    "WNear.ftBalanceOf_absent_parser_cost_obligation"
   ]
 }

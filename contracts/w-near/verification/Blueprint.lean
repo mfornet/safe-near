@@ -1,3 +1,5 @@
+import Bridge.Functions.SerdeKeyArgumentGas
+import Bridge.Functions.SerdeKeyTraceCost
 import Architect
 import Bridge.Methods.FtBalanceOfObjectCase
 import Bridge.Functions.SerdeObjectNoEsc
@@ -1607,7 +1609,7 @@ attribute [blueprint "frontier:object-provider-plan"
 
 attribute [blueprint "frontier:balance-absent-parser-plan"
   (title := /-- Accepted absent-account inputs: parser/resource/gas witness -/)
-  (statement := /-- Precise remaining input obligation outside both completed array and object cases: for accepted input, represented initialized state and an unregistered account, construct the same bounded-input/parser/free-list/gas plan consumed by checked receipt composition. Protocol/domain, escaped/nested parsing and its concrete budget remain unresolved. -/)
+  (statement := /-- Preserves the exact prior plan statement. Checked construction now proves accepted-input positivity and derives size through Context.WF plus the named pinned ceiling. Only the numerical protocol ceiling and actual parser/gas witness are admitted; every dependent assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_absent_parser_plan_obligation
 
@@ -1622,3 +1624,141 @@ attribute [blueprint "frontier:balance-other-input-state-safety"
   (statement := /-- Exact safety complement: excludes every accepted initialized/unregistered-account context and both completed cases. Rejected input, registered/uninitialized states and remaining safety behavior stay Open. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_input_state_no_issue_obligation
+
+attribute [blueprint "frontier:key-traced-reader"
+  (title := /-- Key reader retains segment and allocator charges -/)
+  (statement := /-- Actual function-646 key handoff with the successful string-loop charge and exact scratch endpoint. Room for reachable escaped-string allocation remains explicit; no universal parser-room instance is asserted. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeKeyEsc.f646_key_traced
+
+attribute [blueprint "frontier:key-traced-cost-domination"
+  (title := /-- Traced key charge fits the unchanged public envelope -/)
+  (statement := /-- Proves the previous key charge bounds the retained segment/allocation cost for every bounded successful model key. No original key or method gas statement changes. -/)]
+  WNear.Binary.SerdeKeyEsc.tracedCost_le_keyCost
+
+attribute [blueprint "frontier:key-growth-reader"
+  (title := /-- Existing key contract specializes the traced reader -/)
+  (statement := /-- Preserves the exact old key-reader statement. It is now checked composition of the traced key call and cost domination; the general escaped-string room premise remains unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeKeyEsc.f646_key
+
+attribute [blueprint "frontier:scratch-reuse-free-bound"
+  (title := /-- Scratch clears retain the evolving free-list bound -/)
+  (statement := /-- Across arbitrary append batches starting with used length zero, the free-list bound is initial F plus twice the total actual growth count. Clearing never resets it. -/)]
+  WNear.Binary.ScratchReuseTrace.endFreeBound_eq
+
+attribute [blueprint "frontier:scratch-reuse-walks"
+  (title := /-- Allocator walks across reused scratch -/)
+  (statement := /-- Exact summed allocator-walk identity across clears, retaining the initial F term and the global growth-count square. No constant free-list bound is invented. -/)]
+  WNear.Binary.ScratchReuseTrace.walks_eq
+
+attribute [blueprint "frontier:scratch-reuse-copying"
+  (title := /-- Copying across clears is paid by peak use -/)
+  (statement := /-- Capacity increases telescope across batches. Total old bytes copied are bounded by twice peak used length plus eight, independent of the number of clears. -/)]
+  WNear.Binary.ScratchReuseTrace.movedBytes_peak
+
+attribute [blueprint "frontier:scratch-reuse-pages"
+  (title := /-- Allocator page requests across reused scratch -/)
+  (statement := /-- All page requests are bounded by allocated capacity plus per-growth rounding/header overhead. This is a pure bound under explicit arithmetic trace validity; it does not assume every reserve actually grows memory. -/)]
+  WNear.Binary.ScratchReuseTrace.pages_scaled
+
+attribute [blueprint "frontier:scratch-reuse-budget"
+  (title := /-- Global scratch reserve budget across keys -/)
+  (statement := /-- The complete sum of reserve charges retains changing allocator walks, copied bytes, requested pages and base/unit memory fees. The budget uses one global growth count and peak use rather than a fresh buffer at every key. -/)]
+  WNear.Binary.ScratchReuseTrace.extraCost_budget
+
+attribute [blueprint "frontier:scratch-reuse-growth-power"
+  (title := /-- Clears do not restart geometric growth -/)
+  (statement := /-- A positive global growth count has a power-of-two capacity certificate bounded by peak use. Repeated clears preserve capacity, so each key cannot be charged as a fresh geometric allocation series. -/)]
+  WNear.Binary.ScratchReuseTrace.growthCount_peak
+
+attribute [blueprint "frontier:key-series-growth"
+  (title := /-- Successive traced key calls share scratch accounting -/)
+  (statement := /-- The retained key-reader cost sums to ordinary string work plus the actual globally evolving allocation reserve. This models consecutive key calls with scratch clears; it does not include account allocation or ignored-container operations. -/)]
+  WNear.Binary.SerdeKeyEsc.seriesCost_growth
+
+attribute [blueprint "frontier:key-series-valid"
+  (title := /-- Model-decoded keys discharge append-trace validity -/)
+  (statement := /-- Every successful model key in a bounded input supplies the arithmetic validity and capacity bound of its actual append chunks, carried from one key to the next. No trace-validity obligation is left in the model corollary. -/)]
+  WNear.Binary.SerdeKeyEsc.keyBatches_valid
+
+attribute [blueprint "frontier:key-series-input-budget"
+  (title := /-- Model keys supply the global reuse budget -/)
+  (statement := /-- Discharges arithmetic validity and bounds peak decoded scratch use by the whole input length. The resulting key-only cost bound retains its actual global growth count. Connecting the complete object trace and fitting the unchanged model gas remain unresolved. -/)]
+  WNear.Binary.SerdeKeyEsc.seriesCost_budget_model
+
+attribute [blueprint "frontier:key-series-growth-count"
+  (title := /-- Model key series supplies a logarithmic growth certificate -/)
+  (statement := /-- A bounded successful model key sequence has zero growth or a global power-of-two growth certificate bounded by input length, including arbitrary intervening clears. -/)]
+  WNear.Binary.SerdeKeyEsc.keyBatches_growthCount
+
+attribute [blueprint "frontier:balance-input-nonempty"
+  (title := /-- Every accepted balance call has nonempty input -/)
+  (statement := /-- Kernel-checks that the model decoder rejects the empty byte list, then derives positivity for every accepted ft_balance_of call. No parser/provider or protocol hypothesis is assumed. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.accepted_balance_input_nonempty
+
+attribute [blueprint "frontier:argument-limit-v86"
+  (title := /-- Pinned argument ceiling needed by parser bounds -/)
+  (statement := /-- Exact numerical protocol contract: maxArgumentsLength is at most 4194304 bytes. The pinned JSON implication is separately Open; Context.WF alone does not discharge it. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.ArgumentLimitV86
+
+attribute [blueprint "frontier:receipt-small-arguments"
+  (title := /-- Reviewed receipt bound composes with the argument ceiling -/)
+  (statement := /-- Context.WF supplies the incoming argument-length bound. The explicit protocol ceiling then bounds actual arguments by 4 MiB; that numerical protocol instance is not silently assumed. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.wf_arguments_small
+
+attribute [blueprint "frontier:balance-accepted-input-bounds"
+  (title := /-- Accepted input supplies parser positivity and length -/)
+  (statement := /-- Combines proved accepted-input nonemptiness and the reviewed incoming receipt domain. Positivity is discharged; the pinned numerical ceiling remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.accepted_balance_input_bounds
+
+attribute [blueprint "frontier:absent-plan-input-composition"
+  (title := /-- Parser plan closes its input-domain components -/)
+  (statement := /-- Constructs the original exact parser plan from a shared provider/gas witness, proved accepted-input positivity and the explicit protocol ceiling. The provider, original model budget and pinned ceiling remain named dependencies. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.absent_plan_of_parser_cost
+
+attribute [blueprint "frontier:pinned-arguments-limit"
+  (title := /-- Pinned JSON implies the 4 MiB argument ceiling -/)
+  (statement := /-- Precise remaining protocol field obligation. This does not provide the protocol parse witness, runtime premises or any other field proof. -/)
+  (notReady := true)]
+  WNear.pinned_arguments_obligation
+
+attribute [blueprint "frontier:balance-absent-parser-cost"
+  (title := /-- Accepted absent-account inputs: parser and cost witness -/)
+  (statement := /-- Remaining outside-case obligation is exactly one parser-cost/free-list witness satisfying actual-code execution and the unchanged whole-method budget. Input positivity is proved separately, and input size follows the explicit pinned argument-ceiling obligation. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_absent_parser_cost_obligation
+
+attribute [blueprint "frontier:string-escape-work-sharp"
+  (title := /-- Successful escapes fit 433 operations per encoded byte -/)
+  (statement := /-- Strengthens the existing successful-escape work bound while retaining the actual scratch reserve charge. Includes simple escapes, Unicode and surrogate pairs; no model gas change. -/)]
+  WNear.Binary.ParseStrSuccess.escape_growth_charge_sharp
+
+attribute [blueprint "frontier:string-work-sharp"
+  (title := /-- Successful string work sharpens 470 to 433 operations per byte -/)
+  (statement := /-- Proves the stronger linear bound on the existing successful string-loop charge, including fitting appends and final UTF-8. Every actual allocation/growth cost remains in the separate evolving trace. The deployed model allowance is unchanged. -/)]
+  WNear.Binary.ParseStrSuccess.costRun_growth_sharp
+
+attribute [blueprint "frontier:key-growth-count-v86"
+  (title := /-- Bounded input permits at most 21 global key-scratch growths -/)
+  (statement := /-- Derives a concrete growth-count bound from the checked power certificate and explicit 4 MiB input size. Clears and repeated keys do not restart growth. The pinned protocol field implication remains separately Open. -/)]
+  WNear.Binary.SerdeKeyEsc.keyBatches_growthCount_v86
+
+attribute [blueprint "frontier:key-peak-consumed"
+  (title := /-- Peak key scratch is paid by consumed key bytes -/)
+  (statement := /-- Successful model keys bound peak scratch use by the sum of their consumed source slices, including their closing quotes. This does not assert those slices cover the whole object input. -/)]
+  WNear.Binary.SerdeKeyEsc.keyBatches_peak_consumed
+
+attribute [blueprint "frontier:scratch-reuse-budget-v86"
+  (title := /-- Reviewed costs close the global key reserve formula -/)
+  (statement := /-- For initial free-list bound one and at most 21 growths, the proved reserve formula fits 200 billion gas plus 37 times the reviewed operation price per peak byte. This is the numeric reserve ceiling; full method gas remains unresolved. -/)]
+  WNear.Binary.SerdeKeyEsc.reserve_budget_v86
+
+attribute [blueprint "frontier:key-argument-slice-gas"
+  (title := /-- Key-only cost fits the original argument-byte allowance -/)
+  (statement := /-- Proves the key-only sequence is bounded by a fixed 200-billion-gas reserve plus the unchanged model argumentByteGas for consumed key bytes and two structural bytes per key. Uses actual reused capacity/free-list accounting and reviewed CostsV86. Full input coverage of this slice, account/ignored-container operations and other runtime charges remain Open. -/)]
+  WNear.Binary.SerdeKeyEsc.seriesCost_argument_gas

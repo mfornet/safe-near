@@ -33,6 +33,69 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: input-domain proof and retained key-growth charges
+
+The exact accepted/absent parser-plan obligation now has checked construction.
+`accepted_balance_input_nonempty` proves from the actual model decoder that every
+accepted ft_balance_of input is nonempty. Context.WF supplies the reviewed
+incoming argument bound; a separate `ArgumentLimitV86` field implication bounds
+maxArgumentsLength by 4 MiB, and therefore actual input is below 2^24 bytes.
+That pinned-JSON field implication is Open. The old plan statement is unchanged
+and remains Conditional on this protocol field and the exact shared parser/gas
+witness. No stronger input premise is added to Context.WF or Environment.
+
+The successful string-work bound is strengthened from 470 to **433 regular
+operations per consumed byte**, including fitting appends and final UTF-8.
+Simple escapes, Unicode and surrogate pairs are checked; the evolving scratch
+allocation trace remains separate. Traced key cost domination and the shared
+key-series work bound use this stronger result. The old public key contract and
+all deployed model gas allowances remain unchanged.
+
+The general key reader now retains the successful string loop's segment and
+scratch-allocation charges. The previous key-reader contract is a checked
+specialization using cost domination, with its old statement and allowance
+unchanged. Reachable escaped-string room remains explicit and unresolved.
+
+`ScratchReuseTrace` carries actual capacity and the changing free-list bound
+across append batches separated by scratch clears. It proves telescoping copy
+and allocation bounds, requested-page accounting, exact allocator walks and a
+single global reserve budget. Clears do not restart the geometric growth
+series. For bounded model-decoded key sequences, append-trace arithmetic
+validity and peak use are proved, yielding a key-only allocation/cost bound
+and a power-of-two certificate in whole-input length. These bounds retain F,
+memory-growth fees and every actual growth; they do not reset the heap bound
+or invent fresh scratch at each member.
+
+The global growth certificate also gives **at most 21 key-scratch growths**
+under the explicit 4 MiB input bound. With reviewed CostsV86, the key-only
+sequence fits a fixed **200-billion-gas reserve** plus the actual unchanged
+`WNear.argumentByteGas` allowance for consumed key bytes and **two structural
+bytes per key**. The model coefficient itself is pinned additively at its
+existing 400-million-gas value. Covering this slice by the full object input
+and paying other parser/runtime work are still separate proof obligations.
+
+This is not the complete object resource/gas proof: the full sequence still
+needs account allocation and ignored-container operations, room/endpoint
+invariants and a sufficiently sharp whole-method charge under the unchanged
+model allowance. KeyConditions, ValueConditions, IgnoreHyp, general parser
+room and the actual-code parser/gas witness remain Open. The initialized array
+and explicit 4 MiB escape-free/shallow-object receipts stay Proven; the full
+balance method and global refinement stay Conditional. All 15 methods remain
+tracked. No admission allowance or old statement is relaxed.
+
+Next: connect these retained charges and capacities to the full object trace
+and discharge its resource/charge conditions; resolve the named protocol-field
+and remaining state/input/method obligations.
+Strict full audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T06:03:10+00:00 for proof source `648ee5ec17767595cb561443e62191fc17783f0ae4432a503a3a95d3fb826a6f`. Every old statement pin remains byte-identical;
+new cost/trace/domain declarations are pinned additively. All 42 frontier policy
+tests, Lean style and toolchain checks passed. The existing Proofs.Refinement
+allowance is unchanged and its exact named frontier is checked. A coefficient
+conversion error during integration was repaired and the affected modules
+rechecked before the complete gate. Publication requires matching served
+revision/build/audit evidence and cleared serving health.
+
+
 ## Continuation on 2026-10-31: actual-code provider reaches global receipt callers
 
 `startRes297Provider` retains the complete persistent parser code context from

@@ -1,3 +1,4 @@
+import Bridge.Methods.AcceptedInputBounds
 import Bridge.Methods.FtBalanceOfProviderRefines
 import Spec.Contract
 import Bridge.Exported
@@ -155,8 +156,29 @@ theorem ftTransferCall_obligation (cfg : Config) (codeOf : List UInt8 → Near.C
     Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_transfer_call" := by
   sorry
 
+/-- Exact remaining pinned-JSON argument ceiling; no protocol parse witness is supplied here. -/
+theorem pinned_arguments_obligation (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
+    Binary.InputDomain.ArgumentLimitV86 protocol := by
+  sorry
+
 /-- Remaining accepted initialized/absent inputs need a parser/resource/gas witness, not another receipt proof.
 The same parseGas/outF witness must satisfy both actual code execution and the unchanged model budget. -/
+theorem ftBalanceOf_absent_parser_cost_obligation (cfg : Config)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (ctx : Context) (S : State) (a : AccountId)
+    (hrep : (wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (hparse : (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) (ha : a ∉ S.registered)
+    (hother : ¬ Binary.BalanceOf297AbsentCall.ArrayAbsentCase (some S) ctx (.ftBalanceOf a))
+    (hobject : ¬ Binary.BalanceOf297AbsentCall.ObjectAbsentCase (some S) ctx (.ftBalanceOf a)) :
+    ∃ parseGas outF, Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
+      Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg wNearBytes.size raw (some S) ctx S a parseGas outF := by
+  sorry
+
+/-- Checked construction: accepted-input nonemptiness is proved, and the protocol ceiling and parser cost remain explicit. -/
 theorem ftBalanceOf_absent_parser_plan_obligation (cfg : Config)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -168,7 +190,11 @@ theorem ftBalanceOf_absent_parser_plan_obligation (cfg : Config)
     (hother : ¬ Binary.BalanceOf297AbsentCall.ArrayAbsentCase (some S) ctx (.ftBalanceOf a))
     (hobject : ¬ Binary.BalanceOf297AbsentCall.ObjectAbsentCase (some S) ctx (.ftBalanceOf a)) :
     Binary.BalanceOf297AbsentCall.AbsentParserPlan cfg wNearBytes.size raw (some S) ctx S a ctx.args := by
-  sorry
+  have hlimit : Binary.InputDomain.ArgumentLimitV86 ctx.protocol :=
+    hctx ▸ pinned_arguments_obligation protocol hprotocol
+  exact Binary.BalanceOf297AbsentCall.absent_plan_of_parser_cost cfg wNearBytes.size raw (some S) ctx S a
+    hwf hm hparse hlimit
+    (ftBalanceOf_absent_parser_cost_obligation cfg protocol hprotocol he hcfg raw ctx S a hrep hwf hctx hm hparse ha hother hobject)
 
 /-- Remaining safety contexts outside the completed array and escape-free object cases. -/
 theorem ftBalanceOf_other_input_state_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
