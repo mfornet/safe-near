@@ -43,6 +43,7 @@ import Bridge.Methods.FtBalanceOfInputBound
 import Bridge.Methods.ContextInputDomain
 import Bridge.Methods.FtBalanceOfCodeCompose
 import Bridge.Methods.FtBalanceOfInitialAdequacy
+import Bridge.Methods.FtBalanceOfCopiedCase
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -173,7 +174,7 @@ attribute [blueprint "frontier:method-ft_transfer_call"
 
 attribute [blueprint "frontier:method-ft_balance_of"
   (title := /-- ft\_balance\_of -/)
-  (statement := /-- ft\_balance\_of. Checked assembly remains conditional on the three named open execution, accepted-input and rejected-input obligations. -/)
+  (statement := /-- ft\_balance\_of. Checked assembly is Conditional on general execution safety, rejected-input rollback and the accepted-call composition. That composition integrates the proved copied-array absent-account case and leaves its precise complement Open. -/)
   (notReady := true)]
   WNear.ftBalanceOf_obligation
 
@@ -382,8 +383,8 @@ attribute [blueprint "frontier:balance-no-issue"
   WNear.ftBalanceOf_no_issue_obligation
 
 attribute [blueprint "frontier:balance-accepted"
-  (title := /-- Balance method accepted-input refinement -/)
-  (statement := /-- Open obligation: prove the full refinement and arbitrary-resource clauses for accepted balance calls. -/)
+  (title := /-- ft_balance_of: accepted-call refinement -/)
+  (statement := /-- Checked case composition preserves the original accepted-call statement. The copied-array absent-account case is proved and integrated; its complement remains Open. This assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_accepted_obligation
 
@@ -412,7 +413,7 @@ attribute [blueprint "frontier:balance-export-call-and-copy"
 
 attribute [blueprint "frontier:balance-export-format-zero"
   (title := /-- Exported balance function: serialize zero -/)
-  (statement := /-- The exact decoded call serializes zero under explicit heap-room and frame premises; composition with the preceding slice remains open. -/)
+  (statement := /-- The exact decoded call serializes zero under explicit heap-room and frame premises; the preceding slice is composed by the checked call-copy-format theorem, with its explicit resource premises. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.format_zero
 
@@ -1024,7 +1025,7 @@ attribute [blueprint "frontier:balance-entry-thread"
 
 attribute [blueprint "frontier:balance-entry-activation"
   (title := /-- Balance activation costs eleven regular operations -/)
-  (statement := /-- Checks the separate activation charge of the actual entry frame. It has not yet been integrated with the model gas allowance. -/)]
+  (statement := /-- Checks the eleven regular operations of the actual entry frame. The copied MethodRunsR and model-gas composition now include this charge. -/)]
   WNear.Binary.BalanceOf297AbsentCall.entryCost_297
 
 attribute [blueprint "frontier:balance-entry-adequacy"
@@ -1036,3 +1037,85 @@ attribute [blueprint "frontier:balance-entry-host"
   (title := /-- Balance entry: ending-run host and gas -/)
   (statement := /-- Connects the actual initialized entry thread to both storage-read effects, final host return of quoted zero and bounded used gas for runs that end. Exact input, absent key, host/trie/proof budget, runtime limits and body gas premises remain. No full external method clause is discharged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate_host
+
+attribute [blueprint "frontier:balance-encoded-account-bound"
+  (title := /-- Encoded valid account consumes at most 769 bytes -/)
+  (statement := /-- Derives the encoded bound from actual parser recursion, Unicode escapes and the valid decoded account length. Long whitespace is charged separately. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.account_encoded_le769
+
+attribute [blueprint "frontier:balance-parser-growth-bound"
+  (title := /-- Copied parser has at most five growth allocations -/)
+  (statement := /-- Bounds actual scratch growth for a valid account, including escaped source strings. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_growth_count_le5
+
+attribute [blueprint "frontier:balance-parser-cost-bound"
+  (title := /-- Copied parser numerical gas bound -/)
+  (statement := /-- The exact copied-array parser cost, including trailing whitespace, is at most 300 billion gas plus 80 million per input byte under reviewed costs. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_parser_cost_le300b
+
+attribute [blueprint "frontier:balance-body-cost-bound"
+  (title := /-- Initialized balance body numerical gas bound -/)
+  (statement := /-- The exact body cost is bounded by 400 billion gas plus 100 million per input byte plus the explicit host charges. Includes input, parsing, state read, absent lookup, return and cleanup. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_body_cost_le
+
+attribute [blueprint "frontier:balance-host-cost-bound"
+  (title := /-- Balance host charges numerical bound -/)
+  (statement := /-- Bounds actual input/register/storage/return host charges by 200 billion plus 10 million per input byte, the two trie reads and three returned bytes. Does not assume trie storage charges are disabled. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_host_cost_le
+
+attribute [blueprint "frontier:balance-trie-cost-bound"
+  (title := /-- Two actual reads fit the model trie allowance -/)
+  (statement := /-- Both actual storage reads fit the model cold/cached trie-node budget for the maximum account key. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_body_trie_le
+
+attribute [blueprint "frontier:balance-total-model-gas"
+  (title := /-- Loading, activation and body fit model gas -/)
+  (statement := /-- Funds the exact initialized-body cost, loading and eleven activation operations from the original model gas allowance. No separate gas-budget verification obligation remains for this case. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_total_cost_le_model
+
+attribute [blueprint "frontier:balance-copied-runs"
+  (title := /-- Actual copied balance MethodRunsR -/)
+  (statement := /-- Connects the initialized store and ending-run adequacy to the standard resource-aware method-run contract, including activation and bounded host/gas effects. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_runs
+
+attribute [blueprint "frontier:balance-copied-model-agreement"
+  (title := /-- Copied absent result agrees with model -/)
+  (statement := /-- Derives agreement from represented state and both actual storage-read postconditions, including receipt storage-stake failure. No additional no-deficit assumption. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_agreement_of_represents
+
+attribute [blueprint "frontier:balance-copied-entry-pre"
+  (title := /-- Context supplies copied entry resources -/)
+  (statement := /-- Instantiates input, key/register/return limits, canonical trie, storage view, two-read proof budget and absent storage facts from Context.WF and reviewed runtime limits. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_entry_pre_of
+
+attribute [blueprint "frontier:balance-copied-entry-at"
+  (title := /-- Recorded and unrecorded entry instances -/)
+  (statement := /-- Supplies both entry instances used by boundary composition. Sufficient recorded proof room supplies the budget; unrecorded execution needs no recorded budget. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_entry_at_of_ctx
+
+attribute [blueprint "frontier:balance-copied-case-refinement"
+  (title := /-- Copied array, absent account: full receipt refinement -/)
+  (statement := /-- Proven for initialized represented state, an unregistered account and the exact copied-string array grammar with input length below 2^24. Proves execution safety, sufficient-resource Matches with model gas bound, and arbitrary-resource Matches or rollback. Entry/trie/proof-budget and model-agreement interfaces are concretely instantiated. Other input/state cases remain open. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_refines_init
+
+attribute [blueprint "frontier:balance-copied-case-accepted"
+  (title := /-- Completed case supplies accepted-call assembly -/)
+  (statement := /-- Packages the proved case in the unchanged accepted-call result shape under reviewed Environment. Its caller is the full accepted-call composition, which remains Conditional. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_case_accepted
+
+attribute [blueprint "frontier:balance-other-accepted"
+  (title := /-- ft_balance_of: remaining accepted cases -/)
+  (statement := /-- Precise complementary case of the original accepted-call contract. Excludes the proved initialized copied-array, absent-account branch. Borrowed strings, objects, registered accounts, uninitialized state and other accepted cases remain to be proved. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_other_accepted_obligation
+
+attribute [blueprint "frontier:balance-copied-case-safety"
+  (title := /-- Completed copied case supplies execution safety -/)
+  (statement := /-- Extracts execution safety from the complete copied-array absent-account receipt result under reviewed Environment. Integrated into the unchanged general execution-safety assembly. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_case_no_issue
+
+attribute [blueprint "frontier:balance-other-no-issue"
+  (title := /-- ft_balance_of: remaining execution-safety contexts -/)
+  (statement := /-- General execution safety outside the proved initialized copied-array absent-account case, including rejected input. The precise complement remains Open. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_other_no_issue_obligation

@@ -2,7 +2,7 @@
 
 Campaign status on 2026-10-31; proof continuation is active in `codex/wnear-blueprint-refinement`. The prior receipt-domain checkpoint was wound down and pushed as `9988a700`. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
-The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
+The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over Conditional general execution-safety and accepted-call compositions and Open rejected-input rollback, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
 The three feasibility gates and their evidence, next checks and failure consequences are tracked in [wnear_feasibility_risks.md](wnear_feasibility_risks.md). The asynchronous gate has passing concrete created-receipt/callback traces, including zero-gas rollback probes; the full asynchronous method proofs remain open.
 
@@ -32,6 +32,50 @@ JSON remains open. The old `wf_arguments_unbounded` theorem was removed because
 it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
+
+## Continuation on 2026-10-31: copied absent case reaches receipt refinement
+
+The initialized copied-string array branch for an unregistered account now has
+full receipt-boundary refinement, not only ending-run adequacy.
+`copied_array_absent_refines_init` proves execution safety, Matches and the
+original model gas bound with sufficient gas/proof room, and Matches or resource
+failure with rollback and log prefix for arbitrary resources. Its domain is the
+exact copied-array grammar, initialized represented state, an absent account and
+input length below 2^24, under the reviewed runtime/cost/limit environment.
+
+The exact parser cost is bounded using actual Unicode/escape consumption and
+valid account length. The initialized body includes input, parser, state read,
+lookup, return and cleanup. Loading, eleven activation operations, the body,
+host charges and both trie reads all fit the existing model gas allowance.
+The standard MethodRunsR contract connects the actual initialized execution to
+the boundary theorem. Context.WF and represented storage concretely supply the
+host/trie/proof-budget entry interfaces; both actual read postconditions supply
+model agreement, including receipt storage-stake failure.
+
+`copied_case_accepted` is **Proven and Integrated** into
+`ftBalanceOf_accepted_obligation`. That theorem preserves its original statement
+and now performs a checked case split. Its remaining admission is the precise
+complement `ftBalanceOf_other_accepted_obligation`, rather than re-admitting the
+completed case. Borrowed/object input, registered accounts, uninitialized state
+and other accepted cases remain Open. The accepted-call composition, full
+ft_balance_of clause and global refinement remain **Conditional** through that
+leaf, the complementary execution-safety obligation, rejected-input rollback and the other
+method/protocol obligations. No allowlist scope or old statement was relaxed.
+`IgnoreHyp`, `KeyConditions`, `ValueConditions` and uniform parser/storage/runtime
+contracts remain visible unresolved dependencies; the specific completed case
+uses concrete instances rather than assuming these general contracts.
+
+The execution-safety conjunct is also **Proven and Integrated** through
+`copied_case_no_issue`. The original `ftBalanceOf_no_issue_obligation` statement
+now performs a checked case split and depends only on the precise remaining
+safety complement `ftBalanceOf_other_no_issue_obligation`. Both general safety
+and accepted-call assembly remain Conditional; their completed case is excluded
+from both admitted leaves. Rejected-input rollback remains Open. Next extend
+the accepted parser/state cases while preserving these checked compositions.
+
+LSP diagnostics and kernel axiom checks passed for the completed branch. The
+published checkpoint requires the strict audit and fresh actual-dependency gate
+for proof source `d49fdc130e26f0b982e7778b6e7614d381fed68e5cb5a331a0e112952b66fca8` to pass before commit/publication.
 
 ## Continuation on 2026-10-31: initial-store resources and ending-run adequacy
 

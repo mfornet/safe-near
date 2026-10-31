@@ -276,7 +276,8 @@
         "balance-no-issue",
         "balance-accepted",
         "balance-rejected"
-      ]
+      ],
+      "notes": "Conditional assembly of general execution safety, rejected-input rollback and the accepted-call composition. The accepted composition integrates the proved copied-array absent-account case; its precise complement remains Open."
     },
     {
       "id": "method-ft_resolve_transfer",
@@ -677,32 +678,27 @@
       "id": "balance-no-issue",
       "declaration": "WNear.ftBalanceOf_no_issue_obligation",
       "title": "ft_balance_of: execution safety",
-      "kind": "admission",
-      "indirect_admission": true,
+      "kind": "theorem",
       "label": "frontier:balance-no-issue",
       "reviewed_shape_hash": 676681641,
-      "planned_dependencies": [
-        "runtime-boundary"
-      ]
+      "required_proof_dependencies": [
+        "balance-copied-case-safety",
+        "balance-other-no-issue"
+      ],
+      "notes": "Checked case split preserves the original general execution-safety statement. The copied absent-account case is proved and integrated; safety of the precise complement remains Open. This assembly is Conditional."
     },
     {
       "id": "balance-accepted",
       "declaration": "WNear.ftBalanceOf_accepted_obligation",
       "title": "ft_balance_of: accepted-call refinement",
-      "kind": "admission",
-      "indirect_admission": true,
+      "kind": "theorem",
       "label": "frontier:balance-accepted",
       "reviewed_shape_hash": 1764992096,
-      "planned_dependencies": [
-        "accept-parser",
-        "storage",
-        "runtime-boundary",
-        "ft-balance-model",
-        "balance-copied-body-gas-bound",
-        "balance-entry-host",
-        "balance-entry-activation"
-      ],
-      "notes": "The copied-array absent-account path now has initialized-store resource composition and ending-run entry adequacy. Remaining work includes deriving the body budget from the model allowance with activation, supplying boundary host/trie premises, termination/fuel and arbitrary-resource behavior, other accepted inputs and the general parser contract. The edge from this path to the full accepted clause remains planned."
+      "notes": "Checked case composition preserves the original statement. The copied-array absent-account initialized branch is proved and integrated; the exact complement remains admitted through balance-other-accepted. This result and its full-method/global callers remain visibly Conditional.",
+      "required_proof_dependencies": [
+        "balance-copied-case-accepted",
+        "balance-other-accepted"
+      ]
     },
     {
       "id": "balance-rejected",
@@ -762,7 +758,7 @@
       "declaration": "WNear.Binary.BalanceOf297AbsentCall.format_zero",
       "title": "Function 297: serialize zero balance",
       "kind": "theorem",
-      "environment": "Explicit Wasm frame, serializer data, and allocation-room premises; the preceding segment is not yet composed.",
+      "environment": "Explicit Wasm frame, serializer data and allocation-room premises. Integrated with the preceding segment by the checked call-copy-format composition.",
       "label": "frontier:balance-export-format-zero",
       "reviewed_shape_hash": 1454110285,
       "required_type_dependencies": [
@@ -2180,7 +2176,7 @@
       "title": "Balance activation costs eleven regular operations",
       "kind": "theorem",
       "label": "frontier:balance-entry-activation",
-      "notes": "Checks the separate activation charge of the actual entry frame. It has not yet been integrated with the model gas allowance.",
+      "notes": "Checks the eleven regular operations of the actual entry frame. The copied MethodRunsR and model-gas composition now include this charge.",
       "required_proof_dependencies": [
         "balance-entry-thread"
       ],
@@ -2212,6 +2208,192 @@
         "balance-entry-thread"
       ],
       "reviewed_shape_hash": 2770906355
+    },
+    {
+      "id": "balance-encoded-account-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.account_encoded_le769",
+      "title": "Encoded valid account consumes at most 769 bytes",
+      "kind": "theorem",
+      "label": "frontier:balance-encoded-account-bound",
+      "notes": "Derives the encoded bound from actual parser recursion, Unicode escapes and the valid decoded account length. Long whitespace is charged separately.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 927269430
+    },
+    {
+      "id": "balance-parser-growth-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_growth_count_le5",
+      "title": "Copied parser has at most five growth allocations",
+      "kind": "theorem",
+      "label": "frontier:balance-parser-growth-bound",
+      "notes": "Bounds actual scratch growth for a valid account, including escaped source strings.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4280370396
+    },
+    {
+      "id": "balance-parser-cost-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_parser_cost_le300b",
+      "title": "Copied parser numerical gas bound",
+      "kind": "theorem",
+      "label": "frontier:balance-parser-cost-bound",
+      "notes": "The exact copied-array parser cost, including trailing whitespace, is at most 300 billion gas plus 80 million per input byte under reviewed costs.",
+      "required_proof_dependencies": [
+        "balance-encoded-account-bound",
+        "balance-parser-growth-bound"
+      ],
+      "reviewed_shape_hash": 99019122
+    },
+    {
+      "id": "balance-body-cost-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_body_cost_le",
+      "title": "Initialized balance body numerical gas bound",
+      "kind": "theorem",
+      "label": "frontier:balance-body-cost-bound",
+      "notes": "The exact body cost is bounded by 400 billion gas plus 100 million per input byte plus the explicit host charges. Includes input, parsing, state read, absent lookup, return and cleanup.",
+      "required_proof_dependencies": [
+        "balance-parser-cost-bound"
+      ],
+      "reviewed_shape_hash": 891861895
+    },
+    {
+      "id": "balance-host-cost-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_host_cost_le",
+      "title": "Balance host charges numerical bound",
+      "kind": "theorem",
+      "label": "frontier:balance-host-cost-bound",
+      "notes": "Bounds actual input/register/storage/return host charges by 200 billion plus 10 million per input byte, the two trie reads and three returned bytes. Does not assume trie storage charges are disabled.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2066476772
+    },
+    {
+      "id": "balance-trie-cost-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_body_trie_le",
+      "title": "Two actual reads fit the model trie allowance",
+      "kind": "theorem",
+      "label": "frontier:balance-trie-cost-bound",
+      "notes": "Both actual storage reads fit the model cold/cached trie-node budget for the maximum account key.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2132548967
+    },
+    {
+      "id": "balance-total-model-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_total_cost_le_model",
+      "title": "Loading, activation and body fit model gas",
+      "kind": "theorem",
+      "label": "frontier:balance-total-model-gas",
+      "notes": "Funds the exact initialized-body cost, loading and eleven activation operations from the original model gas allowance. No separate gas-budget verification obligation remains for this case.",
+      "required_proof_dependencies": [
+        "balance-body-cost-bound",
+        "balance-host-cost-bound",
+        "balance-trie-cost-bound"
+      ],
+      "reviewed_shape_hash": 690783025
+    },
+    {
+      "id": "balance-copied-runs",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_runs",
+      "title": "Actual copied balance MethodRunsR",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-runs",
+      "notes": "Connects the initialized store and ending-run adequacy to the standard resource-aware method-run contract, including activation and bounded host/gas effects.",
+      "required_proof_dependencies": [
+        "balance-entry-activation",
+        "balance-entry-adequacy",
+        "balance-end-observations",
+        "balance-entry-thread"
+      ],
+      "reviewed_shape_hash": 1625094088
+    },
+    {
+      "id": "balance-copied-model-agreement",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_agreement_of_represents",
+      "title": "Copied absent result agrees with model",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-model-agreement",
+      "notes": "Derives agreement from represented state and both actual storage-read postconditions, including receipt storage-stake failure. No additional no-deficit assumption.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2153477821
+    },
+    {
+      "id": "balance-copied-entry-pre",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_entry_pre_of",
+      "title": "Context supplies copied entry resources",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-entry-pre",
+      "notes": "Instantiates input, key/register/return limits, canonical trie, storage view, two-read proof budget and absent storage facts from Context.WF and reviewed runtime limits.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2703762407
+    },
+    {
+      "id": "balance-copied-entry-at",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_entry_at_of_ctx",
+      "title": "Recorded and unrecorded entry instances",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-entry-at",
+      "notes": "Supplies both entry instances used by boundary composition. Sufficient recorded proof room supplies the budget; unrecorded execution needs no recorded budget.",
+      "required_proof_dependencies": [
+        "balance-copied-entry-pre"
+      ],
+      "reviewed_shape_hash": 3459790316
+    },
+    {
+      "id": "balance-copied-case-refinement",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_refines_init",
+      "title": "Copied array, absent account: full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-case-refinement",
+      "notes": "Proven for initialized represented state, an unregistered account and the exact copied-string array grammar with input length below 2^24. Proves execution safety, sufficient-resource Matches with model gas bound, and arbitrary-resource Matches or rollback. Entry/trie/proof-budget and model-agreement interfaces are concretely instantiated. Other input/state cases remain open.",
+      "required_proof_dependencies": [
+        "balance-copied-entry-at",
+        "balance-copied-model-agreement",
+        "balance-copied-runs",
+        "balance-total-model-gas"
+      ],
+      "reviewed_shape_hash": 1898457620
+    },
+    {
+      "id": "balance-copied-case-accepted",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_case_accepted",
+      "title": "Completed case supplies accepted-call assembly",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-case-accepted",
+      "notes": "Packages the proved case in the unchanged accepted-call result shape under reviewed Environment. Its caller is the full accepted-call composition, which remains Conditional.",
+      "required_proof_dependencies": [
+        "balance-copied-case-refinement"
+      ],
+      "reviewed_shape_hash": 3277719667
+    },
+    {
+      "id": "balance-other-accepted",
+      "declaration": "WNear.ftBalanceOf_other_accepted_obligation",
+      "title": "ft_balance_of: remaining accepted cases",
+      "kind": "admission",
+      "label": "frontier:balance-other-accepted",
+      "notes": "Precise complementary case of the original accepted-call contract. Excludes the proved initialized copied-array, absent-account branch. Borrowed strings, objects, registered accounts, uninitialized state and other accepted cases remain to be proved.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1399244657,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-copied-case-safety",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_case_no_issue",
+      "title": "Completed copied case supplies execution safety",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-case-safety",
+      "notes": "Extracts execution safety from the complete copied-array absent-account receipt result under reviewed Environment. Integrated into the unchanged general execution-safety assembly.",
+      "required_proof_dependencies": [
+        "balance-copied-case-refinement"
+      ],
+      "reviewed_shape_hash": 795686602
+    },
+    {
+      "id": "balance-other-no-issue",
+      "declaration": "WNear.ftBalanceOf_other_no_issue_obligation",
+      "title": "ft_balance_of: remaining execution-safety contexts",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-other-no-issue",
+      "notes": "General execution safety outside the proved initialized copied-array absent-account case, including rejected input. The precise complement remains Open.",
+      "reviewed_shape_hash": 2725785016
     }
   ],
   "reviewed_environment": [
@@ -2236,8 +2418,8 @@
     "WNear.storageWithdraw_obligation",
     "WNear.storageUnregister_obligation",
     "WNear.storageBalanceOf_obligation",
-    "WNear.ftBalanceOf_no_issue_obligation",
-    "WNear.ftBalanceOf_accepted_obligation",
+    "WNear.ftBalanceOf_other_no_issue_obligation",
+    "WNear.ftBalanceOf_other_accepted_obligation",
     "WNear.ftBalanceOf_rejected_obligation"
   ],
   "expected_incomplete": [
@@ -2260,6 +2442,8 @@
     "WNear.storageBalanceOf_obligation",
     "WNear.ftBalanceOf_no_issue_obligation",
     "WNear.ftBalanceOf_accepted_obligation",
-    "WNear.ftBalanceOf_rejected_obligation"
+    "WNear.ftBalanceOf_rejected_obligation",
+    "WNear.ftBalanceOf_other_accepted_obligation",
+    "WNear.ftBalanceOf_other_no_issue_obligation"
   ]
 }
