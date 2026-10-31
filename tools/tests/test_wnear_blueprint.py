@@ -415,6 +415,48 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Duplicate Lean declaration'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_precise_key_cost_reaches_receipt_without_claiming_gas_complete(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['precise-key-cost-compat', 'precise-key-work']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['precise-key-conditions', 'precise-key-gas', 'object-value-gas',
+                     'object-ignore-charges', 'provider-model-budget', 'ignore-hyp',
+                     'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['precise-key-reader', 'precise-next-key-reader', 'precise-key-hyp',
+                     'precise-object-closing', 'precise-ignored-object', 'precise-ledger-keys',
+                     'precise-ledger-wrapper', 'precise-from-trait', 'precise-from-slice',
+                     'precise-from-slice-room', 'precise-parser-call', 'precise-parser-family',
+                     'precise-deployed-provider', 'precise-provider-plan', 'precise-receipt',
+                     'precise-key-conditions-compat', 'precise-key-gas-compat']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['precise-parser-family', 'precise-deployed-provider', 'precise-provider-plan', 'precise-receipt']:
+            self.assertNotIn('object-key-gas-obligation', result[node]['type_edges'])
+            self.assertNotIn('key-conditions', result[node]['type_edges'])
+            self.assertNotIn('object-key-room-charges', result[node]['type_edges'])
+        self.assertIn({'id': 'precise-receipt', 'status': 'Conditional'}, result['precise-provider-plan']['integrated_into'])
+
+    def test_precise_key_hyp_cannot_skip_actual_next_key_code(self):
+        self.by_id['precise-key-hyp']['proof_dependencies'].remove(self.nodes['precise-next-key-reader']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_precise_object_model_cannot_restore_legacy_key_cost(self):
+        self.by_id['precise-object-closing']['proof_dependencies'].remove(self.nodes['precise-key-hyp']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_precise_receipt_cannot_hide_original_model_budget(self):
+        self.by_id['precise-receipt']['type_dependencies'].remove(self.nodes['provider-model-budget']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_precise_compatibility_cannot_skip_cost_domination(self):
+        self.by_id['precise-key-cost-compat']['proof_dependencies'].remove(self.nodes['key-traced-cost-domination']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

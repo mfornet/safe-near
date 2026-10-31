@@ -33,6 +33,58 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: actual key trace costs reach full receipt refinement
+
+The preserved legacy copied-key allowance still uses its earlier 470-op growth
+envelope. The new preciseCost retains the existing borrowed fast charge and the
+actual copied reader trace charge. Its checked bound is 500+433 operations per
+consumed byte plus real scratch extraCost. It is proved no larger than the old
+keyCost; old key conditions and gas witnesses imply the new precise interfaces.
+No old statement or physical resource contract is weakened.
+
+Actual f646 and f193 contracts now expose this precise cost with the same owned
+key, scratch, cursor, field classification and stack results. A checked keyHyp
+constructor feeds the same actual object loop and closing transport. The full
+ignored-reader constructor composes with this key interface at the unchanged
+costObj recurrence. Concrete ledger room/state closure leaves only the named
+PreciseKeyGasCharges obligation for the key K functions; account and ignored
+reader gas remain explicit as before.
+
+This actual key cost now composes through f78, f66, f65, EOF/whitespace checking,
+result moves and retained scratch cleanup. The same parser-call interface,
+actual-code family/provider and original-budget plan reach the initialized
+absent-account full receipt theorem, retaining safety, sufficient-resource
+Matches/used gas, and arbitrary-resource Matches or resource-failure rollback
+with a log prefix. Initial heap setup, actual code, account output ownership,
+free bound 44 and public observations are unchanged. These assemblies remain
+Conditional on precise key gas, account/ignored gas and ProviderModelBudget.
+They do not establish total gas within the original model allowance.
+
+The quantitative next frontier is reader-prefix reuse. The coarse heap ledger
+intentionally ignores its cursor and admits the initial empty scratch at any
+index. That is sufficient for the completed global physical room/state bounds,
+but a fixed K(q) for every such state can charge fresh allocation repeatedly.
+Gas funding needs more precise prefix capacity/free-state information or a
+checked amortized loop budget. The current ValueHyp/IgnoreHyp interfaces also
+apply at any admitted colon: they do not carry the actual pending key. A prefix
+specialization must account for those hypothetical choices or strengthen the
+phase/key interface with a checked caller composition. No proof assumes those
+choices absent without a corresponding interface fact.
+
+PreciseKeyConditions and PreciseKeyGasCharges remain Open, alongside value and
+ignored gas, the original whole-model budget, remaining methods/states/inputs
+and pinned protocol instances. The legacy IgnoreHyp/KeyConditions/ValueConditions
+and all previous public interfaces remain visible and unchanged. Original model
+gas, reviewed environmental premises, observations and admission policy are
+preserved.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T11:41:50+00:00 for proof source `695baf507574be60f1ffa45a78367fc6cdb1edd4ed6bd52792dc73c77a080552`. All 84 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical; precise key cost/composition interfaces are pinned
+additively. The exact admission frontier and original gas/observation/domain
+statements are unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: reader room constructed through the full receipt pipeline
 
 Concrete key and account-value reader room is now constructed from the retained

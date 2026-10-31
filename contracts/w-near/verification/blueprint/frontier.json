@@ -5779,6 +5779,362 @@
         "provider-plan-receipt-initial"
       ],
       "reviewed_shape_hash": 193876168
+    },
+    {
+      "id": "precise-key-cost-compat",
+      "declaration": "WNear.Binary.SerdeKeyReuse.preciseCost_le_keyCost",
+      "title": "Actual key cost fits the preserved legacy allowance",
+      "kind": "theorem",
+      "label": "frontier:precise-key-cost-compat",
+      "notes": "The borrowed fast charge is unchanged. The copied actual trace charge is bounded by the old keyCost, preserving all old public statements.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "key-traced-cost-domination"
+      ],
+      "reviewed_shape_hash": 2785091246
+    },
+    {
+      "id": "precise-key-work",
+      "declaration": "WNear.Binary.SerdeKeyReuse.preciseCost_growth_sharp",
+      "title": "Precise keys retain 433-op work and actual growth",
+      "kind": "theorem",
+      "label": "frontier:precise-key-work",
+      "notes": "Bounds successful borrowed/copied key work by 500+433 operations per consumed byte plus the real retained-capacity extraCost. It does not substitute the legacy 470-op growth envelope or prove the whole model budget.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "string-work-sharp"
+      ],
+      "reviewed_shape_hash": 27108257
+    },
+    {
+      "id": "precise-key-reader",
+      "declaration": "WNear.Binary.SerdeKeyReuse.f646_key_precise",
+      "title": "Actual f646 key reader at its trace cost",
+      "kind": "theorem",
+      "label": "frontier:precise-key-reader",
+      "notes": "Selects the existing borrowed fast reader or actual copied traced reader, retaining the exact key/scratch resource result and explicit physical room.",
+      "required_type_dependencies": [
+        "string-room"
+      ],
+      "required_proof_dependencies": [
+        "key-traced-reader"
+      ],
+      "reviewed_shape_hash": 2627445680
+    },
+    {
+      "id": "precise-next-key-reader",
+      "declaration": "WNear.Binary.SerdeKeyReuse.f193_key_model_precise",
+      "title": "Actual f193 composes the precise key reader",
+      "kind": "theorem",
+      "label": "frontier:precise-next-key-reader",
+      "notes": "The next-key function keeps its original stack, cursor, result classification and scratch endpoints while consuming the actual key trace charge.",
+      "required_type_dependencies": [
+        "string-room"
+      ],
+      "required_proof_dependencies": [
+        "precise-key-reader"
+      ],
+      "reviewed_shape_hash": 2641723129
+    },
+    {
+      "id": "precise-key-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjKeyState.PreciseKeyConditions",
+      "title": "Precise key gas, room and state contract",
+      "kind": "verification_contract",
+      "label": "frontier:precise-key-conditions",
+      "notes": "Exact key interface for arbitrary caller bounds: physical room, preciseCost versus K, and state closure at the actual capacity/free-bound endpoint. This generic interface remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 10338329516778585787
+    },
+    {
+      "id": "precise-key-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjKeyState.keyHyp_precise",
+      "title": "Precise concrete keys supply the object-loop hypothesis",
+      "kind": "theorem",
+      "label": "frontier:precise-key-hyp",
+      "notes": "Constructs the existing object KeyHyp from the actual precise f193 reader and named PreciseKeyConditions for before/saved states. No new gas-credit ownership is added.",
+      "required_type_dependencies": [
+        "precise-key-conditions",
+        "object-key-hyp"
+      ],
+      "required_proof_dependencies": [
+        "precise-next-key-reader"
+      ],
+      "reviewed_shape_hash": 1325841945
+    },
+    {
+      "id": "precise-object-closing",
+      "declaration": "WNear.Binary.SerdeStructObjModelState.f228_obj_model_closing_precise",
+      "title": "Object model composes precise key charges",
+      "kind": "theorem",
+      "label": "frontier:precise-object-closing",
+      "notes": "Actual f228 composition uses the precise key hypothesis with the same value, ignored-reader, closing and cursor/resource results. Those named interfaces remain explicit.",
+      "required_type_dependencies": [
+        "precise-key-conditions",
+        "value-conditions",
+        "ignore-hyp",
+        "object-closing-conditions"
+      ],
+      "required_proof_dependencies": [
+        "precise-key-hyp",
+        "object-loop-closing",
+        "object-member-closing"
+      ],
+      "reviewed_shape_hash": 3281212725
+    },
+    {
+      "id": "precise-ignored-object",
+      "declaration": "WNear.Binary.SerdeIgnObject.object_loop_v86_closing_precise",
+      "title": "Full ignored reader feeds the precise object model",
+      "kind": "theorem",
+      "label": "frontier:precise-ignored-object",
+      "notes": "The checked full ignored-reader constructor and precise key model compose at the unchanged costObj recurrence, with reachable state, value and closing obligations visible.",
+      "required_type_dependencies": [
+        "precise-key-conditions",
+        "value-conditions",
+        "ignored-reachable-conditions",
+        "object-closing-conditions"
+      ],
+      "required_proof_dependencies": [
+        "precise-object-closing",
+        "ignored-reachable-hyp"
+      ],
+      "reviewed_shape_hash": 1764203907
+    },
+    {
+      "id": "precise-key-gas",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.PreciseKeyGasCharges",
+      "title": "Remaining precise key trace-gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:precise-key-gas",
+      "notes": "Only the actual borrowed/copied preciseCost against selected per-cursor K remains. It is still Open; the coarse ledger does not by itself provide the prefix-specific reuse/gas witness.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 13313800328730700762
+    },
+    {
+      "id": "precise-ledger-keys",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.precise_key_conditions",
+      "title": "Ledger room/state plus precise key gas",
+      "kind": "theorem",
+      "label": "frontier:precise-ledger-keys",
+      "notes": "Constructs precise key room and exact ledger state transport; only PreciseKeyGasCharges is assumed for the chosen K.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "precise-key-conditions"
+      ],
+      "required_proof_dependencies": [
+        "ledger-key-room"
+      ],
+      "reviewed_shape_hash": 3687476459
+    },
+    {
+      "id": "precise-ledger-wrapper",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f78_ledger_precise_cost",
+      "title": "Precise key object reader reaches f78",
+      "kind": "theorem",
+      "label": "frontier:precise-ledger-wrapper",
+      "notes": "Actual object and wrapper code compose with raw scratch initialization, checked room/state, precise key gas, account/ignored gas and explicit LedgerSetup. The original recurrence and output ownership are retained.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "precise-ignored-object",
+        "precise-ledger-keys",
+        "ledger-wrapper-generic",
+        "object-ledger-member",
+        "ledger-value-gas-charges"
+      ],
+      "reviewed_shape_hash": 3648073149
+    },
+    {
+      "id": "precise-from-trait",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f66_ledger_precise",
+      "title": "Precise key allowance survives f66 and cleanup",
+      "kind": "theorem",
+      "label": "frontier:precise-from-trait",
+      "notes": "Actual f66 carries precise key costs through EOF/whitespace checking, result moves and retained scratch cleanup, with the same concrete account result and bounds.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "precise-ledger-wrapper",
+        "ledger-scratch-cleanup",
+        "ledger-final-bounds"
+      ],
+      "reviewed_shape_hash": 2091602928
+    },
+    {
+      "id": "precise-from-slice",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_precise",
+      "title": "Precise parser reaches actual slice entry",
+      "kind": "theorem",
+      "label": "frontier:precise-from-slice",
+      "notes": "Actual f65 composes the precise f66 contract, restores its full caller frame and preserves input/static resources without changing public observations.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "precise-from-trait"
+      ],
+      "reviewed_shape_hash": 2341097453
+    },
+    {
+      "id": "precise-from-slice-room",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_precise_room",
+      "title": "Precise slice parser supplies balance room",
+      "kind": "theorem",
+      "label": "frontier:precise-from-slice-room",
+      "notes": "The same checked concrete owned-account handoff supplies six pages of balance room and the retained output free bound after precise-key parsing.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "precise-from-slice",
+        "ledger-result-room"
+      ],
+      "reviewed_shape_hash": 2906112361
+    },
+    {
+      "id": "precise-parser-call",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_precise_parser_contract",
+      "title": "Precise cost supplies the shared parser-call interface",
+      "kind": "theorem",
+      "label": "frontier:precise-parser-call",
+      "notes": "Packages the actual precise-key slice contract in the unchanged ParserCallContract used by the whole balance execution pipeline.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "object-ledger-setup",
+        "parser-call-contract"
+      ],
+      "required_proof_dependencies": [
+        "precise-from-slice-room"
+      ],
+      "reviewed_shape_hash": 2150081789
+    },
+    {
+      "id": "precise-parser-family",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_precise_parser_family",
+      "title": "Shared family instantiates precise reader room and setup",
+      "kind": "theorem",
+      "label": "frontier:precise-parser-family",
+      "notes": "Real input heap outcomes instantiate setup numerically; remaining reader hypotheses are precise key, account and ignored gas witnesses. No legacy key allowance is assumed in this family.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "precise-parser-call",
+        "ledger-input-bounds"
+      ],
+      "reviewed_shape_hash": 3848098555
+    },
+    {
+      "id": "precise-deployed-provider",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_precise_deployed_parser_provider",
+      "title": "Actual-code provider with precise key costs",
+      "kind": "theorem",
+      "label": "frontier:precise-deployed-provider",
+      "notes": "Transports the precise family from actual persistent function cells for every entry host state, with the same parser cost recurrence and output free bound 44.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "deployed-parser-provider"
+      ],
+      "required_proof_dependencies": [
+        "precise-parser-family",
+        "ledger-parser-code",
+        "parser-family-code-transport"
+      ],
+      "reviewed_shape_hash": 2651767124
+    },
+    {
+      "id": "precise-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_precise_provider_plan",
+      "title": "Actual precise parser couples to the original model budget",
+      "kind": "theorem",
+      "label": "frontier:precise-provider-plan",
+      "notes": "The same K functions and precise actual provider are coupled to unchanged ProviderModelBudget. Reader gas and the whole-method budget remain Open.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "provider-model-budget",
+        "absent-parser-plan"
+      ],
+      "required_proof_dependencies": [
+        "precise-deployed-provider"
+      ],
+      "reviewed_shape_hash": 3813085962
+    },
+    {
+      "id": "precise-receipt",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_precise_refines_init",
+      "title": "Full receipt refinement with precise key allowance",
+      "kind": "theorem",
+      "label": "frontier:precise-receipt",
+      "notes": "Checked initialized absent-account receipt composition retains safety, sufficient-resource Matches/used gas, and arbitrary-resource Matches or resource-failure rollback/log-prefix. Precise key gas, value/ignored gas and the original whole-model budget remain explicit.",
+      "required_type_dependencies": [
+        "precise-key-gas",
+        "object-value-gas",
+        "object-ignore-charges",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "precise-provider-plan",
+        "provider-plan-receipt-initial"
+      ],
+      "reviewed_shape_hash": 729704883
+    },
+    {
+      "id": "precise-key-conditions-compat",
+      "declaration": "WNear.Binary.SerdeStructObjKeyState.precise_conditions_of_legacy",
+      "title": "Legacy key conditions imply precise conditions",
+      "kind": "theorem",
+      "label": "frontier:precise-key-conditions-compat",
+      "notes": "Checked compatibility uses actual preciseCost domination; it preserves the old interface and does not claim its unresolved gas/closure obligations are discharged.",
+      "required_type_dependencies": [
+        "key-conditions",
+        "precise-key-conditions"
+      ],
+      "required_proof_dependencies": [
+        "precise-key-cost-compat"
+      ],
+      "reviewed_shape_hash": 2011311051
+    },
+    {
+      "id": "precise-key-gas-compat",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.precise_gas_of_legacy",
+      "title": "Legacy key gas implies the precise gas contract",
+      "kind": "theorem",
+      "label": "frontier:precise-key-gas-compat",
+      "notes": "The existing legacy gas witness suffices for the sharper actual reader. The reverse implication and gas domination within the original model allowance are not assumed.",
+      "required_type_dependencies": [
+        "object-key-gas-obligation",
+        "precise-key-gas"
+      ],
+      "required_proof_dependencies": [
+        "precise-key-cost-compat"
+      ],
+      "reviewed_shape_hash": 1591459661
     }
   ],
   "reviewed_environment": [

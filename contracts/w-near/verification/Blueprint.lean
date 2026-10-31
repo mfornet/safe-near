@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeObjectProviderPrecise
 import Bridge.Functions.SerdeObjectLedgerGas
 import Bridge.Functions.SerdeObjectLedgerProvider
 import Bridge.Functions.SerdeObjectLedgerComposition
@@ -2473,3 +2474,127 @@ attribute [blueprint "frontier:ledger-gas-receipt"
   (statement := /-- Checked initialized absent-account receipt refinement now assumes only named reader gas and the original whole-model budget, plus reviewed protocol/environment premises. It proves the same safety, sufficient-resource Matches/used gas and arbitrary-resource rollback/log-prefix alternatives conditionally. No room predicate is a remaining reader hypothesis. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectMixedTrace.ledger_gas_refines_init
+
+attribute [blueprint "frontier:precise-key-cost-compat"
+  (title := /-- Actual key cost fits the preserved legacy allowance -/)
+  (statement := /-- The borrowed fast charge is unchanged. The copied actual trace charge is bounded by the old keyCost, preserving all old public statements. -/)]
+  WNear.Binary.SerdeKeyReuse.preciseCost_le_keyCost
+
+attribute [blueprint "frontier:precise-key-work"
+  (title := /-- Precise keys retain 433-op work and actual growth -/)
+  (statement := /-- Bounds successful borrowed/copied key work by 500+433 operations per consumed byte plus the real retained-capacity extraCost. It does not substitute the legacy 470-op growth envelope or prove the whole model budget. -/)]
+  WNear.Binary.SerdeKeyReuse.preciseCost_growth_sharp
+
+attribute [blueprint "frontier:precise-key-reader"
+  (title := /-- Actual f646 key reader at its trace cost -/)
+  (statement := /-- Selects the existing borrowed fast reader or actual copied traced reader, retaining the exact key/scratch resource result and explicit physical room. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeKeyReuse.f646_key_precise
+
+attribute [blueprint "frontier:precise-next-key-reader"
+  (title := /-- Actual f193 composes the precise key reader -/)
+  (statement := /-- The next-key function keeps its original stack, cursor, result classification and scratch endpoints while consuming the actual key trace charge. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeKeyReuse.f193_key_model_precise
+
+attribute [blueprint "frontier:precise-key-conditions"
+  (title := /-- Precise key gas, room and state contract -/)
+  (statement := /-- Exact key interface for arbitrary caller bounds: physical room, preciseCost versus K, and state closure at the actual capacity/free-bound endpoint. This generic interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjKeyState.PreciseKeyConditions
+
+attribute [blueprint "frontier:precise-key-hyp"
+  (title := /-- Precise concrete keys supply the object-loop hypothesis -/)
+  (statement := /-- Constructs the existing object KeyHyp from the actual precise f193 reader and named PreciseKeyConditions for before/saved states. No new gas-credit ownership is added. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjKeyState.keyHyp_precise
+
+attribute [blueprint "frontier:precise-object-closing"
+  (title := /-- Object model composes precise key charges -/)
+  (statement := /-- Actual f228 composition uses the precise key hypothesis with the same value, ignored-reader, closing and cursor/resource results. Those named interfaces remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjModelState.f228_obj_model_closing_precise
+
+attribute [blueprint "frontier:precise-ignored-object"
+  (title := /-- Full ignored reader feeds the precise object model -/)
+  (statement := /-- The checked full ignored-reader constructor and precise key model compose at the unchanged costObj recurrence, with reachable state, value and closing obligations visible. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.object_loop_v86_closing_precise
+
+attribute [blueprint "frontier:precise-key-gas"
+  (title := /-- Remaining precise key trace-gas allowance -/)
+  (statement := /-- Only the actual borrowed/copied preciseCost against selected per-cursor K remains. It is still Open; the coarse ledger does not by itself provide the prefix-specific reuse/gas witness. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.PreciseKeyGasCharges
+
+attribute [blueprint "frontier:precise-ledger-keys"
+  (title := /-- Ledger room/state plus precise key gas -/)
+  (statement := /-- Constructs precise key room and exact ledger state transport; only PreciseKeyGasCharges is assumed for the chosen K. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.precise_key_conditions
+
+attribute [blueprint "frontier:precise-ledger-wrapper"
+  (title := /-- Precise key object reader reaches f78 -/)
+  (statement := /-- Actual object and wrapper code compose with raw scratch initialization, checked room/state, precise key gas, account/ignored gas and explicit LedgerSetup. The original recurrence and output ownership are retained. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f78_ledger_precise_cost
+
+attribute [blueprint "frontier:precise-from-trait"
+  (title := /-- Precise key allowance survives f66 and cleanup -/)
+  (statement := /-- Actual f66 carries precise key costs through EOF/whitespace checking, result moves and retained scratch cleanup, with the same concrete account result and bounds. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f66_ledger_precise
+
+attribute [blueprint "frontier:precise-from-slice"
+  (title := /-- Precise parser reaches actual slice entry -/)
+  (statement := /-- Actual f65 composes the precise f66 contract, restores its full caller frame and preserves input/static resources without changing public observations. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f65_ledger_precise
+
+attribute [blueprint "frontier:precise-from-slice-room"
+  (title := /-- Precise slice parser supplies balance room -/)
+  (statement := /-- The same checked concrete owned-account handoff supplies six pages of balance room and the retained output free bound after precise-key parsing. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f65_ledger_precise_room
+
+attribute [blueprint "frontier:precise-parser-call"
+  (title := /-- Precise cost supplies the shared parser-call interface -/)
+  (statement := /-- Packages the actual precise-key slice contract in the unchanged ParserCallContract used by the whole balance execution pipeline. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_precise_parser_contract
+
+attribute [blueprint "frontier:precise-parser-family"
+  (title := /-- Shared family instantiates precise reader room and setup -/)
+  (statement := /-- Real input heap outcomes instantiate setup numerically; remaining reader hypotheses are precise key, account and ignored gas witnesses. No legacy key allowance is assumed in this family. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_precise_parser_family
+
+attribute [blueprint "frontier:precise-deployed-provider"
+  (title := /-- Actual-code provider with precise key costs -/)
+  (statement := /-- Transports the precise family from actual persistent function cells for every entry host state, with the same parser cost recurrence and output free bound 44. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_precise_deployed_parser_provider
+
+attribute [blueprint "frontier:precise-provider-plan"
+  (title := /-- Actual precise parser couples to the original model budget -/)
+  (statement := /-- The same K functions and precise actual provider are coupled to unchanged ProviderModelBudget. Reader gas and the whole-method budget remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_precise_provider_plan
+
+attribute [blueprint "frontier:precise-receipt"
+  (title := /-- Full receipt refinement with precise key allowance -/)
+  (statement := /-- Checked initialized absent-account receipt composition retains safety, sufficient-resource Matches/used gas, and arbitrary-resource Matches or resource-failure rollback/log-prefix. Precise key gas, value/ignored gas and the original whole-model budget remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_precise_refines_init
+
+attribute [blueprint "frontier:precise-key-conditions-compat"
+  (title := /-- Legacy key conditions imply precise conditions -/)
+  (statement := /-- Checked compatibility uses actual preciseCost domination; it preserves the old interface and does not claim its unresolved gas/closure obligations are discharged. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjKeyState.precise_conditions_of_legacy
+
+attribute [blueprint "frontier:precise-key-gas-compat"
+  (title := /-- Legacy key gas implies the precise gas contract -/)
+  (statement := /-- The existing legacy gas witness suffices for the sharper actual reader. The reverse implication and gas domination within the original model allowance are not assumed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.precise_gas_of_legacy
