@@ -33,6 +33,44 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: pending-field phases integrated into actual object callers
+
+The actual f228 object loop now tracks member(first), value(exact key) and done
+phases in its owned member state. The key reader records the decoded field name;
+the account branch transports its account_id equality, and the ignored branch
+receives the actual key and its inequality. The same costObj recurrence, physical
+resources, caller observations and single gas-credit cell are preserved.
+
+The original f228_obj_state_closing theorem now composes this stronger actual
+loop through four checked phase-independent adapters. All existing model, ignored,
+ledger, precise-key parser and full receipt callers therefore use the phase proof.
+Every old public statement and verification interface is preserved. The four
+phase key/value/ignore/closing interfaces remain Open; these scoped adapters do
+not discharge the original KeyConditions, ValueConditions, IgnoreHyp, gas or
+model-budget obligations. Dependent results remain Conditional.
+
+The pure Prefix relation now records actual successful key/colon/value models,
+exact pending key and cursor, retained scratch segment history, duplicate-account
+condition and whether the account has been saved. Checked proofs show every
+segment is modeled, embed exact prefix coordinates into the unchanged physical
+Ledger, initialize the first-member history at its exact cursor, and recover the
+actual preceding key from a pending-field phase. The first-member phase cannot
+recur with a different cursor/history. These are Proven pure facts; no physical
+phase-aware prefix reader instance or deterministic prefix gas witness is claimed.
+
+The next obligation is to construct phase-indexed physical reader states from
+these prefixes and fund their actual retained-capacity trace under the original
+model allowance. The coarse ledger gas witnesses, PreciseKeyGasCharges,
+ValueGasCharges, IgnoreCharges and ProviderModelBudget remain Open. Remaining
+method/state/input and pinned protocol obligations are unchanged.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T12:07:16+00:00 for proof source `3b237f6e338be1682590a2e188cf327b6c1d777bc248aec137cc78087507c68b`. All 88 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical, including the now-composed original loop contract. The
+exact admission frontier and original gas/observation/domain statements are
+unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: actual key trace costs reach full receipt refinement
 
 The preserved legacy copied-key allowance still uses its earlier 470-op growth

@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeObjectPrefix
 import Bridge.Functions.SerdeObjectProviderPrecise
 import Bridge.Functions.SerdeObjectLedgerGas
 import Bridge.Functions.SerdeObjectLedgerProvider
@@ -2085,7 +2086,7 @@ attribute [blueprint "frontier:object-close-hyp"
 
 attribute [blueprint "frontier:object-loop-closing"
   (title := /-- Actual object loop needs only the final-brace handoff -/)
-  (statement := /-- The complete actual Wasm proof uses CloseHyp at its single final cursor handoff. General key/value/ignore call interfaces remain explicit unresolved dependencies. -/)
+  (statement := /-- The unchanged public f228 contract is now a checked composition of the phase-aware actual loop and four explicit phase-independent adapters. Every existing parser/receipt caller uses this composition. Original key/value/ignore/close interfaces remain explicit unresolved dependencies. -/)
   (notReady := true)]
   WNear.Binary.SerdeStructObjState.f228_obj_state_closing
 
@@ -2598,3 +2599,87 @@ attribute [blueprint "frontier:precise-key-gas-compat"
   (statement := /-- The existing legacy gas witness suffices for the sharper actual reader. The reverse implication and gas domination within the original model allowance are not assumed. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectMixedTrace.precise_gas_of_legacy
+
+attribute [blueprint "frontier:prefix-value-model"
+  (title := /-- Actual value segments supply the retained scratch model -/)
+  (statement := /-- Known-account strings and unknown-key ignored traces each construct the corresponding modeled segment at the exact input endpoint. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.value_segment_model
+
+attribute [blueprint "frontier:phase-key-hyp"
+  (title := /-- Key reader records its pending field -/)
+  (statement := /-- The exact key name indexes the post-key resource state. A concrete phase-aware reader instance is still required. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhase.KeyHyp
+
+attribute [blueprint "frontier:phase-value-hyp"
+  (title := /-- Account reader consumes the known field phase -/)
+  (statement := /-- The value reader requires pending account_id and returns to the next-member phase. This general reader interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhase.ValueHyp
+
+attribute [blueprint "frontier:phase-ignore-hyp"
+  (title := /-- Ignored reader consumes a different pending field -/)
+  (statement := /-- The ignore branch receives the actual pending key and its inequality with account_id. Its concrete phase-aware state/gas instance remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhase.IgnoreHyp
+
+attribute [blueprint "frontier:phase-close-hyp"
+  (title := /-- Brace transports the member phase to done -/)
+  (statement := /-- The final brace carries member resources to the done phase at the exact cursor. The general closing interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhase.CloseHyp
+
+attribute [blueprint "frontier:phase-object-loop"
+  (title := /-- Actual object loop preserves field phases -/)
+  (statement := /-- The deployed f228 loop records the exact parsed field, transports equality in the account branch and supplies inequality in ignored branches. The original gas recurrence and single credit cell are retained. Named key/value/ignore/close instances remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhase.f228_obj_state_closing
+
+attribute [blueprint "frontier:phase-key-compat"
+  (title := /-- Existing key contracts instantiate phase-independent states -/)
+  (statement := /-- Checked adapter supplies the phase-aware key interface when the existing state ignores its phase. Both general interfaces remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.phase_key_hyp
+
+attribute [blueprint "frontier:phase-value-compat"
+  (title := /-- Existing account contracts instantiate phase-independent states -/)
+  (statement := /-- Checked adapter supplies the known-field interface from the original universal account contract without claiming its remaining instances proved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.phase_value_hyp
+
+attribute [blueprint "frontier:phase-ignore-compat"
+  (title := /-- Existing ignore contracts instantiate unknown-key phases -/)
+  (statement := /-- The original universal ignore contract supplies each actual unknown-key branch at a phase-independent state. It retains all existing unresolved reader hypotheses. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.phase_ignore_hyp
+
+attribute [blueprint "frontier:phase-close-compat"
+  (title := /-- Existing brace transport instantiates phase closing -/)
+  (statement := /-- The exact original CloseHyp supplies member-to-done transport for a phase-independent state. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.phase_close_hyp
+
+attribute [blueprint "frontier:prefix-models"
+  (title := /-- Actual prefixes retain modeled scratch segments -/)
+  (statement := /-- The phase-indexed prefix relation records actual key/colon/value models, the pending key, duplicate-account condition, exact cursor, retained segment history and saved-account flag. Every segment is modeled. This does not yet supply physical reader instances or a gas budget. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.models
+
+attribute [blueprint "frontier:prefix-ledger"
+  (title := /-- Exact prefix specializes the coarse physical ledger -/)
+  (statement := /-- Given exact retained capacity/free-list endpoints and the existing physical heap bound, the modeled prefix supplies the original Ledger without weakening its statement. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.ledger
+
+attribute [blueprint "frontier:prefix-initial"
+  (title := /-- Prefix starts at the exact initial member cursor -/)
+  (statement := /-- The empty scratch history starts only at the initial member phase and its specified cursor; the unchanged coarse physical initializer is retained. -/)]
+  WNear.Binary.SerdeObjectPrefix.initial_ledger
+
+attribute [blueprint "frontier:prefix-first-exact"
+  (title := /-- First-member phase cannot recur at another cursor -/)
+  (statement := /-- Every first-member prefix has the initial cursor, empty retained history and no saved account. It does not establish the later deterministic prefix or gas witness. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.first_exact
+
+attribute [blueprint "frontier:prefix-pending-key"
+  (title := /-- Pending field comes from the exact preceding key read -/)
+  (statement := /-- Every value phase exposes its actual preceding key model, saved-account state and retained-history extension. Physical reader constructors and deterministic prefix gas remain missing. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.pending_key

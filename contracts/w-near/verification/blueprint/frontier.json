@@ -4726,7 +4726,7 @@
       "title": "Actual object loop needs only the final-brace handoff",
       "kind": "theorem",
       "label": "frontier:object-loop-closing",
-      "notes": "The complete actual Wasm proof uses CloseHyp at its single final cursor handoff. General key/value/ignore call interfaces remain explicit unresolved dependencies.",
+      "notes": "The unchanged public f228 contract is now a checked composition of the phase-aware actual loop and four explicit phase-independent adapters. Every existing parser/receipt caller uses this composition. Original key/value/ignore/close interfaces remain explicit unresolved dependencies.",
       "reviewed_shape_hash": 344760911,
       "required_type_dependencies": [
         "object-key-hyp",
@@ -4734,7 +4734,13 @@
         "ignore-hyp",
         "object-close-hyp"
       ],
-      "required_proof_dependencies": []
+      "required_proof_dependencies": [
+        "phase-object-loop",
+        "phase-key-compat",
+        "phase-value-compat",
+        "phase-ignore-compat",
+        "phase-close-compat"
+      ]
     },
     {
       "id": "object-loop-monotone",
@@ -6135,6 +6141,194 @@
         "precise-key-cost-compat"
       ],
       "reviewed_shape_hash": 1591459661
+    },
+    {
+      "id": "prefix-value-model",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.value_segment_model",
+      "title": "Actual value segments supply the retained scratch model",
+      "kind": "theorem",
+      "label": "frontier:prefix-value-model",
+      "notes": "Known-account strings and unknown-key ignored traces each construct the corresponding modeled segment at the exact input endpoint.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2145903460
+    },
+    {
+      "id": "phase-key-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjPhase.KeyHyp",
+      "title": "Key reader records its pending field",
+      "kind": "verification_contract",
+      "label": "frontier:phase-key-hyp",
+      "notes": "The exact key name indexes the post-key resource state. A concrete phase-aware reader instance is still required.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 9146869025494019649
+    },
+    {
+      "id": "phase-value-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjPhase.ValueHyp",
+      "title": "Account reader consumes the known field phase",
+      "kind": "verification_contract",
+      "label": "frontier:phase-value-hyp",
+      "notes": "The value reader requires pending account_id and returns to the next-member phase. This general reader interface remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1476731687867214345
+    },
+    {
+      "id": "phase-ignore-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjPhase.IgnoreHyp",
+      "title": "Ignored reader consumes a different pending field",
+      "kind": "verification_contract",
+      "label": "frontier:phase-ignore-hyp",
+      "notes": "The ignore branch receives the actual pending key and its inequality with account_id. Its concrete phase-aware state/gas instance remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1622084536427370440
+    },
+    {
+      "id": "phase-close-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjPhase.CloseHyp",
+      "title": "Brace transports the member phase to done",
+      "kind": "verification_contract",
+      "label": "frontier:phase-close-hyp",
+      "notes": "The final brace carries member resources to the done phase at the exact cursor. The general closing interface remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 7209699495992402439
+    },
+    {
+      "id": "phase-object-loop",
+      "declaration": "WNear.Binary.SerdeStructObjPhase.f228_obj_state_closing",
+      "title": "Actual object loop preserves field phases",
+      "kind": "theorem",
+      "label": "frontier:phase-object-loop",
+      "notes": "The deployed f228 loop records the exact parsed field, transports equality in the account branch and supplies inequality in ignored branches. The original gas recurrence and single credit cell are retained. Named key/value/ignore/close instances remain explicit.",
+      "required_type_dependencies": [
+        "phase-key-hyp",
+        "phase-value-hyp",
+        "phase-ignore-hyp",
+        "phase-close-hyp"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2987299846
+    },
+    {
+      "id": "phase-key-compat",
+      "declaration": "WNear.Binary.SerdeStructObjState.phase_key_hyp",
+      "title": "Existing key contracts instantiate phase-independent states",
+      "kind": "theorem",
+      "label": "frontier:phase-key-compat",
+      "notes": "Checked adapter supplies the phase-aware key interface when the existing state ignores its phase. Both general interfaces remain Open.",
+      "required_type_dependencies": [
+        "phase-key-hyp",
+        "object-key-hyp"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3993768681
+    },
+    {
+      "id": "phase-value-compat",
+      "declaration": "WNear.Binary.SerdeStructObjState.phase_value_hyp",
+      "title": "Existing account contracts instantiate phase-independent states",
+      "kind": "theorem",
+      "label": "frontier:phase-value-compat",
+      "notes": "Checked adapter supplies the known-field interface from the original universal account contract without claiming its remaining instances proved.",
+      "required_type_dependencies": [
+        "phase-value-hyp",
+        "object-value-hyp"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3124734018
+    },
+    {
+      "id": "phase-ignore-compat",
+      "declaration": "WNear.Binary.SerdeStructObjState.phase_ignore_hyp",
+      "title": "Existing ignore contracts instantiate unknown-key phases",
+      "kind": "theorem",
+      "label": "frontier:phase-ignore-compat",
+      "notes": "The original universal ignore contract supplies each actual unknown-key branch at a phase-independent state. It retains all existing unresolved reader hypotheses.",
+      "required_type_dependencies": [
+        "phase-ignore-hyp",
+        "ignore-hyp"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1650811503
+    },
+    {
+      "id": "phase-close-compat",
+      "declaration": "WNear.Binary.SerdeStructObjState.phase_close_hyp",
+      "title": "Existing brace transport instantiates phase closing",
+      "kind": "theorem",
+      "label": "frontier:phase-close-compat",
+      "notes": "The exact original CloseHyp supplies member-to-done transport for a phase-independent state.",
+      "required_type_dependencies": [
+        "phase-close-hyp",
+        "object-close-hyp"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1656204779
+    },
+    {
+      "id": "prefix-models",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.models",
+      "title": "Actual prefixes retain modeled scratch segments",
+      "kind": "theorem",
+      "label": "frontier:prefix-models",
+      "notes": "The phase-indexed prefix relation records actual key/colon/value models, the pending key, duplicate-account condition, exact cursor, retained segment history and saved-account flag. Every segment is modeled. This does not yet supply physical reader instances or a gas budget.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-value-model"
+      ],
+      "reviewed_shape_hash": 220640304
+    },
+    {
+      "id": "prefix-ledger",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.ledger",
+      "title": "Exact prefix specializes the coarse physical ledger",
+      "kind": "theorem",
+      "label": "frontier:prefix-ledger",
+      "notes": "Given exact retained capacity/free-list endpoints and the existing physical heap bound, the modeled prefix supplies the original Ledger without weakening its statement.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-models"
+      ],
+      "reviewed_shape_hash": 149740423
+    },
+    {
+      "id": "prefix-initial",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.initial_ledger",
+      "title": "Prefix starts at the exact initial member cursor",
+      "kind": "theorem",
+      "label": "frontier:prefix-initial",
+      "notes": "The empty scratch history starts only at the initial member phase and its specified cursor; the unchanged coarse physical initializer is retained.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "object-ledger-initial"
+      ],
+      "reviewed_shape_hash": 1444799923
+    },
+    {
+      "id": "prefix-first-exact",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.first_exact",
+      "title": "First-member phase cannot recur at another cursor",
+      "kind": "theorem",
+      "label": "frontier:prefix-first-exact",
+      "notes": "Every first-member prefix has the initial cursor, empty retained history and no saved account. It does not establish the later deterministic prefix or gas witness.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 127564908
+    },
+    {
+      "id": "prefix-pending-key",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.pending_key",
+      "title": "Pending field comes from the exact preceding key read",
+      "kind": "theorem",
+      "label": "frontier:prefix-pending-key",
+      "notes": "Every value phase exposes its actual preceding key model, saved-account state and retained-history extension. Physical reader constructors and deterministic prefix gas remain missing.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3333817202
     }
   ],
   "reviewed_environment": [

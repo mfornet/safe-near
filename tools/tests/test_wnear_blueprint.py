@@ -457,6 +457,40 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_phase_loop_is_integrated_without_closing_reader_obligations(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['phase-key-hyp', 'phase-value-hyp', 'phase-ignore-hyp', 'phase-close-hyp',
+                     'key-conditions', 'value-conditions', 'ignore-hyp', 'precise-key-gas',
+                     'object-value-gas', 'object-ignore-charges', 'provider-model-budget']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['phase-object-loop', 'phase-key-compat', 'phase-value-compat',
+                     'phase-ignore-compat', 'phase-close-compat', 'object-loop-closing',
+                     'precise-object-closing', 'precise-receipt']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['prefix-value-model', 'prefix-models', 'prefix-ledger', 'prefix-initial',
+                     'prefix-first-exact', 'prefix-pending-key']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['phase-object-loop', 'phase-key-compat', 'phase-value-compat',
+                     'phase-ignore-compat', 'phase-close-compat']:
+            self.assertIn({'id': 'object-loop-closing', 'status': 'Conditional'}, result[node]['integrated_into'])
+        self.assertIn({'id': 'precise-object-closing', 'status': 'Conditional'}, result['object-loop-closing']['integrated_into'])
+
+    def test_old_loop_cannot_skip_actual_phase_composition(self):
+        self.by_id['object-loop-closing']['proof_dependencies'].remove(self.nodes['phase-object-loop']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_old_loop_cannot_skip_phase_ignore_instantiation(self):
+        self.by_id['object-loop-closing']['proof_dependencies'].remove(self.nodes['phase-ignore-compat']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_prefix_ledger_cannot_skip_actual_segment_models(self):
+        self.by_id['prefix-ledger']['proof_dependencies'].remove(self.nodes['prefix-models']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
