@@ -1150,6 +1150,21 @@
     "WNear.Binary.BalanceOf297NoneCall.accepted_none_array_model",
     "WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines",
     "WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines_under_limit",
-    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation"
+    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation",
+    "WNear.Binary.PanicExpectError.expectErrArgs",
+    "WNear.Binary.PanicExpectError.f881_spec",
+    "WNear.Binary.PanicExpectError.f881_full",
+    "WNear.Binary.PanicDebug.DebugCalleeSpec",
+    "WNear.Binary.PanicDebug.f882_delegate",
+    "WNear.Binary.PanicDebug.serde_error_debug_vtable",
+    "WNear.Binary.PanicDebug.serde_error_debug_table",
+    "WNear.Binary.PanicDebug.dynamic_debug_table",
+    "WNear.Binary.PanicDebug.SerdeErrorDebugSpec",
+    "WNear.Binary.PanicDebug.f882_serde_error_delegate",
+    "WNear.Binary.FormatResult.f610_success",
+    "WNear.Binary.FormatResult.f725_pair",
+    "WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode",
+    "WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode_eq",
+    "WNear.Binary.BalanceOf297RejectPanic.parser_handoff_reject"
   ]
 }

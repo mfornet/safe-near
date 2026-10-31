@@ -1,3 +1,6 @@
+import Bridge.Functions.BalanceOf297RejectPanic
+import Bridge.Functions.PanicDebug
+import Bridge.Functions.FormatResult
 import Bridge.Methods.FtBalanceOfUninitialized
 import Bridge.Methods.FtBalanceOfInitialized
 import Bridge.Functions.BalanceOf297PresentFamily
@@ -265,7 +268,7 @@ attribute [blueprint "frontier:accept-parser"
 
 attribute [blueprint "frontier:reject-parser"
   (title := /-- Uniform rejecting argument contract -/)
-  (statement := /-- Uniform rejecting argument contract. Open verification obligation; its statement exists but is not discharged. -/)
+  (statement := /-- Uniform rejecting argument contract. Open verification obligation; its statement exists but is not discharged. Its current errAt postcondition retains the error pointer and heap summary but not the owned error-box cells needed by Debug; a stronger owned-error producer contract must be proved before composing actual rejected formatting. -/)
   (notReady := true)]
   WNear.Binary.FromSliceSpec.RejectContract
 
@@ -4386,3 +4389,93 @@ attribute [blueprint "frontier:none-model-budget-contract"
   (statement := /-- Exact original loading, entry activation and body inequality. This generic interface remains Open; checked weighted-object and array constructors discharge each concrete instance. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297NoneCall.NoneProviderModelBudget
+
+attribute [blueprint "frontier:reject-common-panic-spec"
+  (title := /-- Exact common panic contract remains unresolved -/)
+  (statement := /-- Exact function-817 trap contract, owned payload/frame/environment and message bytes. A definition check only states this interface; the rejected balance caller still needs a concrete formatting instance. -/)
+  (notReady := true)]
+  WNear.Binary.PanicFmt.Spec817
+
+attribute [blueprint "frontier:reject-payload-get-spec"
+  (title := /-- Panic payload formatter contract -/)
+  (statement := /-- Exact payload get formatter over retained owned resources and a cost chosen before the gas ceiling. Generic interface remains Open; rejecting serde payload instances are not yet supplied. -/)
+  (notReady := true)]
+  WNear.Binary.PanicWithHook.GetSpec
+
+attribute [blueprint "frontier:reject-to-string-spec"
+  (title := /-- PanicInfo to-string formatter contract -/)
+  (statement := /-- Exact function-470 string production contract with owned output, stack and finite cost. Generic interface remains Open; actual rejected-message formatting and resource bounds must be constructed. -/)
+  (notReady := true)]
+  WNear.Binary.PanicHook.ToStr
+
+attribute [blueprint "frontier:reject-debug-callee-spec"
+  (title := /-- Dynamic Debug callee correctness interface -/)
+  (statement := /-- Exact normal-return operational specification of the selected trait callee, with preserved ownership and cost. Dispatch correctness does not prove the formatter. -/)
+  (notReady := true)]
+  WNear.Binary.PanicDebug.DebugCalleeSpec
+
+attribute [blueprint "frontier:serde-error-debug-spec"
+  (title := /-- Actual serde error Debug function-641 frontier -/)
+  (statement := /-- Exact selected deployed function-641 formatter contract. It remains Open; line/column, ErrorCode formatting, heap behavior and full message bounds are not inferred from the proven vtable dispatch. -/)
+  (notReady := true)]
+  WNear.Binary.PanicDebug.SerdeErrorDebugSpec
+
+attribute [blueprint "frontier:expect-error-panic-entry"
+  (title := /-- Result unwrap failure builds two-argument panic payload -/)
+  (statement := /-- Actual function 881 constructs the exact two-argument record and delegates through 859. Its stack, ownership and instruction cost are kernel checked; the common Spec817 formatting contract remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.PanicExpectError.f881_spec
+
+attribute [blueprint "frontier:expect-error-common-hook"
+  (title := /-- Unwrap failure composes the common installed panic hook -/)
+  (statement := /-- Checked composition through the actual common panic path. Exact GetSpec and ToStr, UTF-8, log-fit and read-byte bounds remain premises. This does not establish rejected receipt safety or discharge the serde formatter. -/)
+  (notReady := true)]
+  WNear.Binary.PanicExpectError.f881_full
+
+attribute [blueprint "frontier:debug-trampoline"
+  (title := /-- Dynamic Debug preserves descriptor and delegates exact trait call -/)
+  (statement := /-- Actual function 882 loads the error pointer, vtable and method slot, then calls indirect type 13. One gas credit resource and exact activation charge are retained. The selected formatter contract remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.PanicDebug.f882_delegate
+
+attribute [blueprint "frontier:serde-error-vtable"
+  (title := /-- Deployed serde error vtable selects slot 12 -/)
+  (statement := /-- Kernel checked data word at deployed vtable 1049036 plus method offset 12. This is a binary data fact and does not itself supply owned runtime cells or formatter correctness. -/)]
+  WNear.Binary.PanicDebug.serde_error_debug_vtable
+
+attribute [blueprint "frontier:serde-error-table"
+  (title := /-- Deployed table slot 12 selects serde Debug function 641 -/)
+  (statement := /-- Kernel checked actual binary function-table entry. Runtime ownership and the selected formatter contract remain separate obligations. -/)]
+  WNear.Binary.PanicDebug.serde_error_debug_table
+
+attribute [blueprint "frontier:dynamic-debug-table"
+  (title := /-- Deployed table slot 200 selects dynamic Debug function 882 -/)
+  (statement := /-- Kernel checked actual function-table entry used by the two-argument unwrap-failed payload. It does not instantiate all resources or the downstream formatter. -/)]
+  WNear.Binary.PanicDebug.dynamic_debug_table
+
+attribute [blueprint "frontier:serde-error-debug-dispatch"
+  (title := /-- Actual serde vtable dispatch composes exact Debug activation -/)
+  (statement := /-- Concrete owned vtable/table slots delegate to actual function 641 at 19 regular operations plus its independent cost. Exact formatter remains a named Open contract; no full rejected receipt is claimed. -/)
+  (notReady := true)]
+  WNear.Binary.PanicDebug.f882_serde_error_delegate
+
+attribute [blueprint "frontier:format-success-return"
+  (title := /-- Successful format-result unwrap restores stack -/)
+  (statement := /-- Actual function 610 success branch restores its global stack pointer and returns normally at exactly 12 regular operations. It does not assume a formatter contract or prove the failure branch. -/)]
+  WNear.Binary.FormatResult.f610_success
+
+attribute [blueprint "frontier:format-argument-pair"
+  (title := /-- Actual line and column argument pair constructor -/)
+  (statement := /-- Actual function 725 writes the exact pointer/tag pair with retained owned cells at six regular operations. This local constructor is proven; formatting the selected values remains separate. -/)]
+  WNear.Binary.FormatResult.f725_pair
+
+attribute [blueprint "frontier:balance-reject-handoff-code"
+  (title := /-- Rejected balance handoff is exact deployed code -/)
+  (statement := /-- Kernel checked equality to the actual block at function-297 instruction offset 36. No source-level control-flow approximation is used. -/)]
+  WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode_eq
+
+attribute [blueprint "frontier:balance-reject-panic-block"
+  (title := /-- Actual rejected balance parser-result branch calls checked panic entry -/)
+  (statement := /-- Given the actual rejected result tag and owned error box pointer, function 297 stores its descriptor and calls function 881. The exact block, stack, activation and one-credit composition are checked. Conditional on the common panic-formatting contract; parser rejection production, whole-body adequacy, resource cases and rejected receipt safety/rollback remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297RejectPanic.parser_handoff_reject

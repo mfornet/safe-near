@@ -910,6 +910,57 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_rejected_balance_block_keeps_common_panic_frontier(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        self.assertEqual(nodes['balance-reject-panic-block']['status'], 'Conditional')
+        self.assertEqual(nodes['reject-common-panic-spec']['status'], 'Open')
+        self.assertIn({'id': 'balance-reject-panic-block', 'status': 'Conditional'},
+                      nodes['expect-error-panic-entry']['integrated_into'])
+        self.by_id['balance-reject-panic-block']['type_dependencies'] = []
+        with self.assertRaises(ValueError):
+            blueprint.classify(self.manifest, self.rows)
+
+    def test_common_panic_composition_cannot_hide_formatting_contracts(self):
+        for dependency in ['reject-payload-get-spec', 'reject-to-string-spec']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes['expect-error-common-hook']['declaration'])
+            row['type_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_dynamic_debug_does_not_prove_its_selected_formatter(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        self.assertEqual(nodes['debug-trampoline']['status'], 'Conditional')
+        self.assertEqual(nodes['reject-debug-callee-spec']['status'], 'Open')
+        self.assertEqual(nodes['serde-error-debug-dispatch']['status'], 'Conditional')
+        self.assertEqual(nodes['serde-error-debug-spec']['status'], 'Open')
+        self.assertIn({'id': 'serde-error-debug-dispatch', 'status': 'Conditional'},
+                      nodes['debug-trampoline']['integrated_into'])
+
+    def test_serde_dispatch_cannot_drop_actual_function_641_frontier(self):
+        self.by_id['serde-error-debug-dispatch']['type_dependencies'] = []
+        with self.assertRaises(ValueError):
+            blueprint.classify(self.manifest, self.rows)
+
+    def test_binary_debug_facts_and_local_helpers_are_proven_separately(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-error-vtable', 'serde-error-table', 'dynamic-debug-table',
+                   'format-success-return', 'format-argument-pair', 'balance-reject-handoff-code']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+            self.assertFalse(nodes[id]['direct_sorry'])
+            self.assertFalse(nodes[id]['type_edges'])
+        for id in ['balance-rejected', 'balance-initialized-rejected-safety',
+                   'balance-uninitialized-rejected-safety', 'reject-parser']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+
+    def test_rejected_balance_integration_cannot_drop_actual_code_or_entry(self):
+        for dependency in ['expect-error-panic-entry', 'balance-reject-handoff-code']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes['balance-reject-panic-block']['declaration'])
+            row['proof_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan', 'pinned-arguments-limit', 'ignore-hyp', 'key-conditions', 'value-conditions']:

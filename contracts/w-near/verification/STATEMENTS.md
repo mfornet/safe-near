@@ -9591,6 +9591,63 @@ theorem WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gasF {GF
       (List.take 82 (List.drop 68 WNear.Binary.f297.body)) Φ
 ```
 
+## Bridge.Functions.BalanceOf297RejectPanic
+
+`WNear.Binary.BalanceOf297RejectPanic.parser_handoff_reject` (hash `00000000d4e007df`)
+
+```lean
+theorem WNear.Binary.BalanceOf297RejectPanic.parser_handoff_reject {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 5 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64) (x3 err old : UInt32)
+  (hs : 112 ≤ s.toNat) (hframe : s.toNat + 160 ≤ 2 ^ 32) (E : Iris.IProp GF) (K : ℕ) (h : Wasm.NearState)
+  (bs : List UInt8) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        A 881 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[39]! inst WNear.Binary.f881 ∗
+          WNear.Binary.PanicFmt.Spec817 cfg lim (d + 5) inst mi Cg n g gt (s - 64 - 16 - 16 - 16)
+              (s - 64 - 16 - 16 - 16) (s - 64 + 24) (s - 64 - 16) 1050984
+              iprop(n ↦[wms][ (s - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (s - 64 + 24) ∗
+                  WNear.Binary.PanicFmt.argsHead n (s - 64 + 24) 2 2 ∗
+                    WNear.Binary.PanicExpectError.expectErrArgs n (s - 64) 1050760 38 (s + 128) 1049036 ∗
+                      n ↦[wms][ s.toNat + 88 ] WasmLogic.bytes32 1 ∗
+                        n ↦[wms][ s.toNat + 92 ] WasmLogic.bytes32 err ∗
+                          n ↦[wms][ s.toNat + 128 ] WasmLogic.bytes32 err ∗ E)
+              K h bs ∗
+            NearLogic.credits Cg (300 * cfg.regularOpCost + K) ∗
+              g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                WNear.Binary.VecFromElem.stk n (s.toNat - 112) 112 ∗
+                  n ↦[wms][ s.toNat + 88 ] WasmLogic.bytes32 1 ∗
+                    n ↦[wms][ s.toNat + 92 ] WasmLogic.bytes32 err ∗
+                      n ↦[wms][ s.toNat + 128 ] WasmLogic.bytes32 old ∗
+                        E ∗ ▷ (WNear.Binary.PanicStr.panicked Cg h bs -∗ Φ.trap) ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) []
+      (List.take 1 (List.drop 36 WNear.Binary.f297.body)) Φ
+```
+
+`WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode` (hash `b0594b2262148f3c`)
+
+```lean
+def WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode : List Wasm.Instr :=
+  [Wasm.Instr.block Wasm.BlockType.empty
+      [Wasm.Instr.local_get 0, Wasm.Instr.load Wasm.NumType.i32 none { align := 2, offset := 88 },
+        Wasm.Instr.i32_const 1, Wasm.Instr.i32_relop Wasm.IRelOp.ne, Wasm.Instr.br_if 0,
+        Wasm.Instr.local_get 0, Wasm.Instr.local_get 0,
+        Wasm.Instr.load Wasm.NumType.i32 none { align := 2, offset := 92 },
+        Wasm.Instr.store Wasm.NumType.i32 none { align := 2, offset := 128 },
+        Wasm.Instr.i32_const 1050760, Wasm.Instr.i32_const 38, Wasm.Instr.local_get 0,
+        Wasm.Instr.i32_const 128, Wasm.Instr.i32_binop Wasm.IBinOp.add,
+        Wasm.Instr.i32_const 1049036, Wasm.Instr.i32_const 1050984, Wasm.Instr.call 881,
+        Wasm.Instr.unreachable]]
+```
+
+`WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode_eq` (hash `000000003728513e`)
+
+```lean
+theorem WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode_eq :
+  List.take 1 (List.drop 36 WNear.Binary.f297.body) = WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode
+```
+
 ## Bridge.Functions.BalanceOf297Return
 
 `WNear.Binary.BalanceOf297AbsentCall.return_vec` (hash `000000000b35889c`)
@@ -10644,6 +10701,38 @@ theorem WNear.Binary.EnvInput.f527_spec {GF : Iris.BundledGFunctors} [WasmLogic.
       (WNear.Binary.EnvInput.post527 n g ta A gt s out idx maxP len live h)
 ```
 
+## Bridge.Functions.FormatResult
+
+`WNear.Binary.FormatResult.f610_success` (hash `00000000641cfe67`)
+
+```lean
+theorem WNear.Binary.FormatResult.f610_success {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 0)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (n g ta : ℕ) (A : ℕ → ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (Cg : ℕ)
+  (gt : Wasm.GlobalType) (sp : UInt32) :
+  ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f610 Cg
+      (fun args => iprop(⌜args = [Wasm.Value.i32 0]⌝ ∗ g ↦[wg] { type := gt, value := Wasm.Value.i32 sp }))
+      (fun x => 12 * cfg.regularOpCost) fun x rs =>
+      iprop(⌜rs = []⌝ ∗ g ↦[wg] { type := gt, value := Wasm.Value.i32 sp })
+```
+
+`WNear.Binary.FormatResult.f725_pair` (hash `00000000597d2a89`)
+
+```lean
+theorem WNear.Binary.FormatResult.f725_pair {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 0)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (n : ℕ) (hn : mi.memAddrs[0]? = some n) (Cg : ℕ) (out ptr tag old0 old4 : UInt32)
+  (hout : out.toNat + 8 ≤ 2 ^ 32) :
+  ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f725 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 ptr, Wasm.Value.i32 tag]⌝ ∗
+            n ↦[wms][ out.toNat ] WasmLogic.bytes32 old0 ∗ n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 old4))
+      (fun x => 6 * cfg.regularOpCost) fun x rs =>
+      iprop(⌜rs = []⌝ ∗ n ↦[wms][ out.toNat ] WasmLogic.bytes32 ptr ∗ n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 tag)
+```
+
 ## Bridge.Functions.FromSliceEsc
 
 `WNear.Binary.FromSliceEsc.f65_arr_copied` (hash `00000000fd9468c4`)
@@ -11016,6 +11105,186 @@ theorem WNear.Binary.LookupMapGet.f400_none {GF : Iris.BundledGFunctors} [WasmLo
 ```lean
 def WNear.Binary.LookupMapOps.HeapRoomK (k len maxP : ℕ) : Prop :=
   len % 65536 = 0 ∧ 0 < len ∧ len + k * 65536 ≤ maxP * 65536 ∧ len + (k + 1) * 65536 ≤ 2 ^ 32
+```
+
+## Bridge.Functions.PanicDebug
+
+`WNear.Binary.PanicDebug.DebugCalleeSpec` (hash `2699e7cd345349f9`)
+
+```lean
+def WNear.Binary.PanicDebug.DebugCalleeSpec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (code : Wasm.Func)
+  (err fmt : UInt32) (Kw Cg : ℕ) (P Q : Iris.IProp GF) : Iris.IProp GF :=
+  fun Q =>
+    NearLogic.MFunSpec cfg lim d WNear.Binary.types[13]! inst mi code Cg
+      (fun args => iprop(⌜args = [Wasm.Value.i32 err, Wasm.Value.i32 fmt]⌝ ∗ P)) (fun x => Kw)
+      fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ Q)
+```
+
+`WNear.Binary.PanicDebug.SerdeErrorDebugSpec` (hash `b297dad876fbefe3`)
+
+```lean
+def WNear.Binary.PanicDebug.SerdeErrorDebugSpec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (err fmt : UInt32)
+  (Kw Cg : ℕ) (P Q : Iris.IProp GF) : Iris.IProp GF :=
+  fun Q =>
+    NearLogic.MFunSpec cfg lim d WNear.Binary.types[13]! inst mi WNear.Binary.f641 Cg
+      (fun args => iprop(⌜args = [Wasm.Value.i32 err, Wasm.Value.i32 fmt]⌝ ∗ P)) (fun x => Kw)
+      fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ Q)
+```
+
+`WNear.Binary.PanicDebug.dynamic_debug_table` (hash `0000000003f46ef6`)
+
+```lean
+theorem WNear.Binary.PanicDebug.dynamic_debug_table : WNear.Binary.wTable.elems[200]? = some (Wasm.Ref.func 882)
+```
+
+`WNear.Binary.PanicDebug.f882_delegate` (hash `00000000625de305`)
+
+```lean
+theorem WNear.Binary.PanicDebug.f882_delegate {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (pp err vt fi fmt : UInt32) (af : ℕ) (code : Wasm.Func) (Kw : ℕ)
+  (P Q : Iris.IProp GF) (hpp : pp.toNat + 8 ≤ 2 ^ 32) (hvt : vt.toNat + 16 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      af ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst code ∗
+        WNear.Binary.PanicDebug.DebugCalleeSpec cfg lim (d + 1) inst mi code err fmt Kw Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f882 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 pp, Wasm.Value.i32 fmt]⌝ ∗
+            n ↦[wms][ pp.toNat ] WasmLogic.bytes32 err ∗
+              n ↦[wms][ pp.toNat + 4 ] WasmLogic.bytes32 vt ∗
+                n ↦[wms][ vt.toNat + 12 ] WasmLogic.bytes32 fi ∗ ta ↦[wt][ fi.toNat ] Wasm.Ref.func af ∗ P))
+      (fun x =>
+        8 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals code [Wasm.Value.i32 err, Wasm.Value.i32 fmt]) +
+          Kw)
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ pp.toNat ] WasmLogic.bytes32 err ∗
+            n ↦[wms][ pp.toNat + 4 ] WasmLogic.bytes32 vt ∗
+              n ↦[wms][ vt.toNat + 12 ] WasmLogic.bytes32 fi ∗ ta ↦[wt][ fi.toNat ] Wasm.Ref.func af ∗ Q)
+```
+
+`WNear.Binary.PanicDebug.f882_serde_error_delegate` (hash `00000000af042b7a`)
+
+```lean
+theorem WNear.Binary.PanicDebug.f882_serde_error_delegate {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (pp err fmt : UInt32) (Kw : ℕ) (P Q : Iris.IProp GF)
+  (hpp : pp.toNat + 8 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      A 641 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f641 ∗
+        WNear.Binary.PanicDebug.SerdeErrorDebugSpec cfg lim (d + 1) inst mi err fmt Kw Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f882 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 pp, Wasm.Value.i32 fmt]⌝ ∗
+            n ↦[wms][ pp.toNat ] WasmLogic.bytes32 err ∗
+              n ↦[wms][ pp.toNat + 4 ] WasmLogic.bytes32 1049036 ∗
+                n ↦[wms][ 1049048 ] WasmLogic.bytes32 12 ∗ ta ↦[wt][ 12 ] Wasm.Ref.func (A 641) ∗ P))
+      (fun x => 19 * cfg.regularOpCost + Kw) fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ pp.toNat ] WasmLogic.bytes32 err ∗
+            n ↦[wms][ pp.toNat + 4 ] WasmLogic.bytes32 1049036 ∗
+              n ↦[wms][ 1049048 ] WasmLogic.bytes32 12 ∗ ta ↦[wt][ 12 ] Wasm.Ref.func (A 641) ∗ Q)
+```
+
+`WNear.Binary.PanicDebug.serde_error_debug_table` (hash `00000000e70380fc`)
+
+```lean
+theorem WNear.Binary.PanicDebug.serde_error_debug_table : WNear.Binary.wTable.elems[12]? = some (Wasm.Ref.func 641)
+```
+
+`WNear.Binary.PanicDebug.serde_error_debug_vtable` (hash `000000004474df77`)
+
+```lean
+theorem WNear.Binary.PanicDebug.serde_error_debug_vtable : WNear.Binary.Interface.dataWord (1049036 + 12) = WasmLogic.bytes32 12
+```
+
+## Bridge.Functions.PanicExpectError
+
+`WNear.Binary.PanicExpectError.expectErrArgs` (hash `2e4193197debf233`)
+
+```lean
+def WNear.Binary.PanicExpectError.expectErrArgs {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (n : ℕ)
+  (s m l err vt : UInt32) : Iris.IProp GF :=
+  fun vt =>
+    iprop(n ↦[wms][ s.toNat + 8 ] WasmLogic.bytes32 m ∗
+        n ↦[wms][ s.toNat + 12 ] WasmLogic.bytes32 l ∗
+          n ↦[wms][ s.toNat + 16 ] WasmLogic.bytes32 err ∗
+            n ↦[wms][ s.toNat + 20 ] WasmLogic.bytes32 vt ∗
+              n ↦[wms][ s.toNat + 24 ] WasmLogic.bytes32 1070640 ∗
+                n ↦[wms][ s.toNat + 32 ] WasmLogic.bytes32 0 ∗
+                  n ↦[wms][ s.toNat + 40 ] WasmLogic.bytes32 (s + 48) ∗
+                    n ↦[wms][ s.toNat + 48 ] WasmLogic.bytes32 (s + 8) ∗
+                      n ↦[wms][ s.toNat + 52 ] WasmLogic.bytes32 195 ∗
+                        n ↦[wms][ s.toNat + 56 ] WasmLogic.bytes32 (s + 16) ∗
+                          n ↦[wms][ s.toNat + 60 ] WasmLogic.bytes32 200)
+```
+
+`WNear.Binary.PanicExpectError.f881_full` (hash `000000000b4ca3c6`)
+
+```lean
+theorem WNear.Binary.PanicExpectError.f881_full {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 14 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp m l err vt loc lpc : UInt32) (hloc : loc ≠ 0)
+  (S : ℕ) (hS : 32 ≤ S) (hsp : S + 192 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (Ga G' D1 : Iris.IProp GF) (Kg K : ℕ)
+  (bs : List UInt8) (hpos : 0 < bs.length) (hlen : bs.length < 2 ^ 32) (hutf : Wasm.Near.validUtf8 bs = true)
+  (h : Wasm.NearState) (hfit : NearLogic.LogFits h bs.length)
+  (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        WNear.Binary.PanicFmt.code817 e inst mi A n mx ∗
+          A 826 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f826 ∗
+            WNear.Binary.PanicWithHook.GetSpec cfg lim (d + 6) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16 - 16 - 32)
+                (sp - 64 - 16 - 16 - 16 - 16) (sp - 64 - 16 - 16 - 16 - 16 + 4) 1066400 (S + 32) WNear.Binary.f826
+                iprop(WNear.Binary.PanicFmt.fmtPayload n (sp - 64 - 16 - 16 - 16 - 16) (sp - 64 + 24) ∗
+                    WNear.Binary.PanicFmt.argsHead n (sp - 64 + 24) 2 2 ∗
+                      WNear.Binary.PanicExpectError.expectErrArgs n (sp - 64) m l err vt ∗ Ga)
+                G' Kg ∗
+              WNear.Binary.PanicHook.ToStr cfg lim (d + 8) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16 - 16 - 32 - 32)
+                (sp - 64 - 16 - 16 - 16 - 16 - 32 + 16) S
+                iprop(WNear.Binary.PanicWithHook.infoCells n (sp - 64 - 16 - 16 - 16 - 16 - 32 + 16)
+                      (sp - 64 - 16 - 16 - 16 - 16 + 4) 1066400 (sp - 64 + 24) loc ∗
+                    G' ∗ n ↦[wms][ (sp - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (sp - 64 + 24) ∗ D1)
+                K bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f881 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 m, Wasm.Value.i32 l, Wasm.Value.i32 err, Wasm.Value.i32 vt, Wasm.Value.i32 loc]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 112) 112 ∗
+                WNear.Binary.VecFromElem.stk n ((sp - 64 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
+                  Ga ∗ WNear.Binary.PanicFmt.envP n ta A lpc 1066360 179 (A 826) D1 h))
+      (fun x => 250 * cfg.regularOpCost + WNear.Binary.PanicFmt.cost817 cfg WNear.Binary.f826 Kg K bs h)
+      (fun x x_1 => iprop(False)) fun x => WNear.Binary.PanicStr.panicked Cg h bs
+```
+
+`WNear.Binary.PanicExpectError.f881_spec` (hash `000000003a7fd022`)
+
+```lean
+theorem WNear.Binary.PanicExpectError.f881_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (inst : ℕ) (mi : Wasm.ModuleInst)
+  (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 4 < lim.maxCallDepth) (Cg : ℕ)
+  (gt : Wasm.GlobalType) (sp m l err vt loc : UInt32) (hsp : 112 ≤ sp.toNat) (hloc : loc ≠ 0) (E : Iris.IProp GF)
+  (K : ℕ) (h : Wasm.NearState) (bs : List UInt8) :
+  WNear.Binary.PanicFmt.code859 inst mi A ∗
+      A 859 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f859 ∗
+        WNear.Binary.PanicFmt.Spec817 cfg lim (d + 4) inst mi Cg n g gt (sp - 64 - 16 - 16 - 16)
+          (sp - 64 - 16 - 16 - 16) (sp - 64 + 24) (sp - 64 - 16) loc
+          iprop(n ↦[wms][ (sp - 64 - 16).toNat + 8 ] WasmLogic.bytes32 (sp - 64 + 24) ∗
+              WNear.Binary.PanicFmt.argsHead n (sp - 64 + 24) 2 2 ∗
+                WNear.Binary.PanicExpectError.expectErrArgs n (sp - 64) m l err vt ∗ E)
+          K h bs ⊢
+    NearLogic.MFunSpecT cfg lim d type inst mi WNear.Binary.f881 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 m, Wasm.Value.i32 l, Wasm.Value.i32 err, Wasm.Value.i32 vt, Wasm.Value.i32 loc]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 112) 112 ∗ E))
+      (fun x => 250 * cfg.regularOpCost + K) (fun x x_1 => iprop(False)) fun x => WNear.Binary.PanicStr.panicked Cg h bs
 ```
 
 ## Bridge.Functions.ReadRegister

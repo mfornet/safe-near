@@ -33,6 +33,41 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: rejected parser-result branch reaches checked panic entry
+
+The actual rejected-result block at function-297 offset 36 now composes the
+checked function-881 unwrap-failure entry. It retains the exact tag/error pointer,
+stores the actual descriptor, and pays the real activation through one gas credit
+cell. Function 881 constructs the exact two-argument formatting record and
+composes through the installed common panic path. These results remain Conditional:
+Spec817, payload GetSpec and PanicInfo ToStr are named Open formatter contracts;
+UTF-8, log-fit, read-byte and resource bounds are still explicit where assumed.
+
+The actual function-882 dynamic Debug trampoline and deployed serde vtable/table
+specialization preserve owned descriptors and pay the exact activation. Binary
+data/table facts are independently Proven. The actual function-641 serde error
+formatter remains a precise Open contract; dispatch does not prove formatting.
+Function-610 successful unwrap and function-725 line/column argument construction
+are independently Proven local instruction results.
+
+This closes a real rejection control-flow dependency, not the rejected method
+obligations. Producing all rejected parser results, actual ErrorCode and numeric
+formatting, message/heap/resource cases, whole-body adequacy and receipt safety/
+rollback remain unfinished. The existing RejectContract/errAt interface retains an error pointer and heap
+summary, but discards the error-box cell ownership needed by Debug. A new stronger
+owned-error producer contract must retain valid ErrorCode/message cells through
+parser cleanup; the old public statement is preserved. The current full accepted
+receipts and their original root compositions are unchanged. No admission moved, no old statement changed,
+and no audit allowance expanded. All 15 methods and global refinement retain
+their actual proof statuses; no missing formatter is presented as Proven.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T18:55:38+00:00 for proof source `95c823c0741e6728433690eba65b93ab1576c1da9e15bb9140d4b3fccc3410d0`. All 150 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin,
+shape and proof status is unchanged; the exact direct and transitive admission
+frontiers and strict module allowance are unchanged. New conditional callers keep
+each named formatter dependency explicit. Live publication must match this evidence.
+
 ## Continuation on 2026-10-31: all uninitialized accepted balance calls compose
 
 Every accepted uninitialized ft_balance_of call now has complete checked deployed

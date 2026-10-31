@@ -436,7 +436,8 @@
         "value-conditions"
       ],
       "label": "frontier:reject-parser",
-      "reviewed_shape_hash": 5907064027448999036
+      "reviewed_shape_hash": 5907064027448999036,
+      "notes": "Uniform rejecting argument contract. Open verification obligation; its statement exists but is not discharged. Its current errAt postcondition retains the error pointer and heap summary but not the owned error-box cells needed by Debug; a stronger owned-error producer contract must be proved before composing actual rejected formatting."
     },
     {
       "id": "object-parser",
@@ -10760,6 +10761,200 @@
       "required_type_dependencies": [],
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 16093302341597834088
+    },
+    {
+      "id": "reject-common-panic-spec",
+      "declaration": "WNear.Binary.PanicFmt.Spec817",
+      "title": "Exact common panic contract remains unresolved",
+      "kind": "verification_contract",
+      "label": "frontier:reject-common-panic-spec",
+      "notes": "Exact function-817 trap contract, owned payload/frame/environment and message bytes. A definition check only states this interface; the rejected balance caller still needs a concrete formatting instance.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 6140711189238748173
+    },
+    {
+      "id": "reject-payload-get-spec",
+      "declaration": "WNear.Binary.PanicWithHook.GetSpec",
+      "title": "Panic payload formatter contract",
+      "kind": "verification_contract",
+      "label": "frontier:reject-payload-get-spec",
+      "notes": "Exact payload get formatter over retained owned resources and a cost chosen before the gas ceiling. Generic interface remains Open; rejecting serde payload instances are not yet supplied.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 17500453716335911764
+    },
+    {
+      "id": "reject-to-string-spec",
+      "declaration": "WNear.Binary.PanicHook.ToStr",
+      "title": "PanicInfo to-string formatter contract",
+      "kind": "verification_contract",
+      "label": "frontier:reject-to-string-spec",
+      "notes": "Exact function-470 string production contract with owned output, stack and finite cost. Generic interface remains Open; actual rejected-message formatting and resource bounds must be constructed.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 5301697131725941859
+    },
+    {
+      "id": "reject-debug-callee-spec",
+      "declaration": "WNear.Binary.PanicDebug.DebugCalleeSpec",
+      "title": "Dynamic Debug callee correctness interface",
+      "kind": "verification_contract",
+      "label": "frontier:reject-debug-callee-spec",
+      "notes": "Exact normal-return operational specification of the selected trait callee, with preserved ownership and cost. Dispatch correctness does not prove the formatter.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2781509113410177529
+    },
+    {
+      "id": "serde-error-debug-spec",
+      "declaration": "WNear.Binary.PanicDebug.SerdeErrorDebugSpec",
+      "title": "Actual serde error Debug function-641 frontier",
+      "kind": "verification_contract",
+      "label": "frontier:serde-error-debug-spec",
+      "notes": "Exact selected deployed function-641 formatter contract. It remains Open; line/column, ErrorCode formatting, heap behavior and full message bounds are not inferred from the proven vtable dispatch.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 12868995083478495203
+    },
+    {
+      "id": "expect-error-panic-entry",
+      "declaration": "WNear.Binary.PanicExpectError.f881_spec",
+      "title": "Result unwrap failure builds two-argument panic payload",
+      "kind": "theorem",
+      "label": "frontier:expect-error-panic-entry",
+      "notes": "Actual function 881 constructs the exact two-argument record and delegates through 859. Its stack, ownership and instruction cost are kernel checked; the common Spec817 formatting contract remains explicit.",
+      "required_type_dependencies": [
+        "reject-common-panic-spec"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 981454882
+    },
+    {
+      "id": "expect-error-common-hook",
+      "declaration": "WNear.Binary.PanicExpectError.f881_full",
+      "title": "Unwrap failure composes the common installed panic hook",
+      "kind": "theorem",
+      "label": "frontier:expect-error-common-hook",
+      "notes": "Checked composition through the actual common panic path. Exact GetSpec and ToStr, UTF-8, log-fit and read-byte bounds remain premises. This does not establish rejected receipt safety or discharge the serde formatter.",
+      "required_type_dependencies": [
+        "reject-payload-get-spec",
+        "reject-to-string-spec"
+      ],
+      "required_proof_dependencies": [
+        "expect-error-panic-entry"
+      ],
+      "reviewed_shape_hash": 189572038
+    },
+    {
+      "id": "debug-trampoline",
+      "declaration": "WNear.Binary.PanicDebug.f882_delegate",
+      "title": "Dynamic Debug preserves descriptor and delegates exact trait call",
+      "kind": "theorem",
+      "label": "frontier:debug-trampoline",
+      "notes": "Actual function 882 loads the error pointer, vtable and method slot, then calls indirect type 13. One gas credit resource and exact activation charge are retained. The selected formatter contract remains Open.",
+      "required_type_dependencies": [
+        "reject-debug-callee-spec"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1650320133
+    },
+    {
+      "id": "serde-error-vtable",
+      "declaration": "WNear.Binary.PanicDebug.serde_error_debug_vtable",
+      "title": "Deployed serde error vtable selects slot 12",
+      "kind": "theorem",
+      "label": "frontier:serde-error-vtable",
+      "notes": "Kernel checked data word at deployed vtable 1049036 plus method offset 12. This is a binary data fact and does not itself supply owned runtime cells or formatter correctness.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1148510071
+    },
+    {
+      "id": "serde-error-table",
+      "declaration": "WNear.Binary.PanicDebug.serde_error_debug_table",
+      "title": "Deployed table slot 12 selects serde Debug function 641",
+      "kind": "theorem",
+      "label": "frontier:serde-error-table",
+      "notes": "Kernel checked actual binary function-table entry. Runtime ownership and the selected formatter contract remain separate obligations.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3875766524
+    },
+    {
+      "id": "dynamic-debug-table",
+      "declaration": "WNear.Binary.PanicDebug.dynamic_debug_table",
+      "title": "Deployed table slot 200 selects dynamic Debug function 882",
+      "kind": "theorem",
+      "label": "frontier:dynamic-debug-table",
+      "notes": "Kernel checked actual function-table entry used by the two-argument unwrap-failed payload. It does not instantiate all resources or the downstream formatter.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 66350838
+    },
+    {
+      "id": "serde-error-debug-dispatch",
+      "declaration": "WNear.Binary.PanicDebug.f882_serde_error_delegate",
+      "title": "Actual serde vtable dispatch composes exact Debug activation",
+      "kind": "theorem",
+      "label": "frontier:serde-error-debug-dispatch",
+      "notes": "Concrete owned vtable/table slots delegate to actual function 641 at 19 regular operations plus its independent cost. Exact formatter remains a named Open contract; no full rejected receipt is claimed.",
+      "required_type_dependencies": [
+        "serde-error-debug-spec"
+      ],
+      "required_proof_dependencies": [
+        "debug-trampoline"
+      ],
+      "reviewed_shape_hash": 2936286074
+    },
+    {
+      "id": "format-success-return",
+      "declaration": "WNear.Binary.FormatResult.f610_success",
+      "title": "Successful format-result unwrap restores stack",
+      "kind": "theorem",
+      "label": "frontier:format-success-return",
+      "notes": "Actual function 610 success branch restores its global stack pointer and returns normally at exactly 12 regular operations. It does not assume a formatter contract or prove the failure branch.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1679621735
+    },
+    {
+      "id": "format-argument-pair",
+      "declaration": "WNear.Binary.FormatResult.f725_pair",
+      "title": "Actual line and column argument pair constructor",
+      "kind": "theorem",
+      "label": "frontier:format-argument-pair",
+      "notes": "Actual function 725 writes the exact pointer/tag pair with retained owned cells at six regular operations. This local constructor is proven; formatting the selected values remains separate.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1501375113
+    },
+    {
+      "id": "balance-reject-handoff-code",
+      "declaration": "WNear.Binary.BalanceOf297RejectPanic.rejectHandoffCode_eq",
+      "title": "Rejected balance handoff is exact deployed code",
+      "kind": "theorem",
+      "label": "frontier:balance-reject-handoff-code",
+      "notes": "Kernel checked equality to the actual block at function-297 instruction offset 36. No source-level control-flow approximation is used.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 925389118
+    },
+    {
+      "id": "balance-reject-panic-block",
+      "declaration": "WNear.Binary.BalanceOf297RejectPanic.parser_handoff_reject",
+      "title": "Actual rejected balance parser-result branch calls checked panic entry",
+      "kind": "theorem",
+      "label": "frontier:balance-reject-panic-block",
+      "notes": "Given the actual rejected result tag and owned error box pointer, function 297 stores its descriptor and calls function 881. The exact block, stack, activation and one-credit composition are checked. Conditional on the common panic-formatting contract; parser rejection production, whole-body adequacy, resource cases and rejected receipt safety/rollback remain Open.",
+      "required_type_dependencies": [
+        "reject-common-panic-spec"
+      ],
+      "required_proof_dependencies": [
+        "expect-error-panic-entry",
+        "balance-reject-handoff-code"
+      ],
+      "reviewed_shape_hash": 3571451871
     }
   ],
   "reviewed_environment": [
