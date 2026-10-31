@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfWeightedLinearGas
 import Bridge.Methods.FtBalanceOfSmallGeneralObject
 import Bridge.Methods.FtBalanceOfProviderLinearGas
 import Bridge.Functions.SerdeMixedPrefix
@@ -3384,3 +3385,292 @@ attribute [blueprint "frontier:balance-absent-parser-complement"
   (statement := /-- Same actual-code provider and unchanged whole-model budget must be supplied for accepted initialized/unregistered inputs outside all three completed array, escape-free object and <=10000-byte full general-object cases. The explicit negated SmallGeneralObjectAbsentCase premise is part of this audited statement. This obligation is Open; no full-domain funding is claimed. -/)
   (notReady := true)]
   WNear.ftBalanceOf_absent_parser_complement_obligation
+
+attribute [blueprint "frontier:weighted-close-dispatch"
+  (title := /-- Actual closing dispatch costs 30 operations -/)
+  (statement := /-- The unchanged binary closing dispatch executes within 30 regular operations; no code, environmental premise or observation changes. -/)]
+  WNear.Binary.SerdeIgnContainer.dispatch_close_tight
+
+attribute [blueprint "frontier:weighted-close-block"
+  (title := /-- Checked tighter closing block nonempty -/)
+  (statement := /-- Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints. -/)]
+  WNear.Binary.SerdeIgnClosing.block_nonempty_tight
+
+attribute [blueprint "frontier:weighted-close-empty-block"
+  (title := /-- Checked tighter closing block empty -/)
+  (statement := /-- Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints. -/)]
+  WNear.Binary.SerdeIgnClosing.block_empty_tight
+
+attribute [blueprint "frontier:weighted-close-step"
+  (title := /-- Checked tighter closing iteration nonempty -/)
+  (statement := /-- Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints. -/)]
+  WNear.Binary.SerdeIgnClosing.iteration_nonempty_tight
+
+attribute [blueprint "frontier:weighted-close-last-step"
+  (title := /-- Checked tighter closing iteration empty -/)
+  (statement := /-- Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints. -/)]
+  WNear.Binary.SerdeIgnClosing.iteration_empty_tight
+
+attribute [blueprint "frontier:weighted-push-bound"
+  (title := /-- Actual trace pushes fit consumed input -/)
+  (statement := /-- Derives the number of future frame pushes from the real successful machine run. No abstract bound is assumed. -/)]
+  WNear.Binary.SerdeIgnWeightedBudget.pushes_le_remaining
+
+attribute [blueprint "frontier:weighted-reserve"
+  (title := /-- Discounted reserve covers actual depth -/)
+  (statement := /-- The weighted potential keeps the 470-byte rate, reserves 184 per depth and discounts 74 per actual frame push. Guards prove natural subtraction does not discard required work. -/)]
+  WNear.Binary.SerdeIgnWeightedBudget.regular_reserve
+
+attribute [blueprint "frontier:weighted-close-funded"
+  (title := /-- Weighted reserve funds a real non-final close -/)
+  (statement := /-- Exact pending trace pop preserves the push discount while releasing the checked depth reserve. -/)]
+  WNear.Binary.SerdeIgnClosing.funded_nonempty_weighted
+
+attribute [blueprint "frontier:weighted-close-last-funded"
+  (title := /-- Weighted reserve funds the final close -/)
+  (statement := /-- The empty pending trace returns the same resources with the tighter checked closing cost. -/)]
+  WNear.Binary.SerdeIgnClosing.funded_empty_weighted
+
+attribute [blueprint "frontier:weighted-opening"
+  (title := /-- Actual opening consumes exactly its trace push -/)
+  (statement := /-- Physical frame save, scratch growth and model determinism thread the 74-operation discount through the real opening block. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnOpening.entry_funded_weighted
+
+attribute [blueprint "frontier:weighted-scalar-entry"
+  (title := /-- Scalar entry preserves the weighted reserve -/)
+  (statement := /-- Original 470-per-byte scalar allowance remains unchanged; exact remaining trace supplies the discount and depth guards. -/)]
+  WNear.Binary.SerdeIgnValueEntry.pending_entry_weighted
+
+attribute [blueprint "frontier:weighted-object-member"
+  (title := /-- Actual object member retains the push discount -/)
+  (statement := /-- Real key/string and colon transitions preserve the same future operations and retained scratch history. -/)]
+  WNear.Binary.SerdeIgnMember.object_traced_weighted
+
+attribute [blueprint "frontier:weighted-next-member"
+  (title := /-- Both member branches preserve weighted funding -/)
+  (statement := /-- Actual array and object member paths return the exact value model and discounted reserve. -/)]
+  WNear.Binary.SerdeIgnMember.next_traced_weighted
+
+attribute [blueprint "frontier:weighted-next-funded"
+  (title := /-- Checked weighted next member -/)
+  (statement := /-- The real member transition retains exactly one credit resource and the push count of its returned successful model. -/)]
+  WNear.Binary.SerdeIgnMemberBudget.next_funded_weighted
+
+attribute [blueprint "frontier:weighted-first-funded"
+  (title := /-- Checked weighted first member -/)
+  (statement := /-- The real member transition retains exactly one credit resource and the push count of its returned successful model. -/)]
+  WNear.Binary.SerdeIgnMemberBudget.first_funded_weighted
+
+attribute [blueprint "frontier:weighted-comma-funded"
+  (title := /-- Checked weighted comma member -/)
+  (statement := /-- The real member transition retains exactly one credit resource and the push count of its returned successful model. -/)]
+  WNear.Binary.SerdeIgnMemberBudget.comma_funded_weighted
+
+attribute [blueprint "frontier:weighted-loop-iteration"
+  (title := /-- Actual container iteration uses the weighted frontier -/)
+  (statement := /-- Composes checked close, first and comma transitions over the same binary iteration and exact model. -/)]
+  WNear.Binary.SerdeIgnWeightedLoop.iteration
+
+attribute [blueprint "frontier:weighted-loop"
+  (title := /-- Actual container loop retains frame savings -/)
+  (statement := /-- Checked loop invariant follows actual remaining input, depth and trace pushes without duplicating credits. -/)]
+  WNear.Binary.SerdeIgnWeightedLoop.loop
+
+attribute [blueprint "frontier:weighted-loop-phase"
+  (title := /-- Weighted container phase reaches its callers -/)
+  (statement := /-- The actual exit/error tail composes the weighted loop and preserves all rejected tails. -/)]
+  WNear.Binary.SerdeIgnWeightedLoop.phase
+
+attribute [blueprint "frontier:weighted-loop-suffix"
+  (title := /-- Weighted phase composes into the actual member suffix -/)
+  (statement := /-- Real phase and member paths return the precise pending value model and ownership. -/)]
+  WNear.Binary.SerdeIgnWeightedLoop.suffix
+
+attribute [blueprint "frontier:weighted-decoded-suffix"
+  (title := /-- Weighted suffix is the deployed instruction slice -/)
+  (statement := /-- The checked binary slice identity connects the weighted suffix proof to the deployed reader. -/)]
+  WNear.Binary.SerdeIgnWeightedLoop.decoded_suffix
+
+attribute [blueprint "frontier:weighted-opening-stack"
+  (title := /-- Opening adapts to the actual reader stack -/)
+  (statement := /-- Retains the exact scratch state and one credit resource while composing the weighted opening. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnValueEntry.opening_entry128_weighted
+
+attribute [blueprint "frontier:weighted-value-continuation"
+  (title := /-- Actual reader continuation carries discounted work -/)
+  (statement := /-- Composes the weighted opening stack and decoded suffix with exact heap/model endpoints. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.continue_suffix
+
+attribute [blueprint "frontier:weighted-value-iteration"
+  (title := /-- Actual value iteration handles scalar and container paths -/)
+  (statement := /-- Unchanged scalar blocks and weighted container continuation preserve the exact successful model. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.value_iteration
+
+attribute [blueprint "frontier:weighted-value-loop"
+  (title := /-- Actual value loop accumulates trace discounts -/)
+  (statement := /-- The complete real loop retains the selected trace push discount and physical heap history. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.value_loop
+
+attribute [blueprint "frontier:weighted-main"
+  (title := /-- Actual main reader funds its full suffix -/)
+  (statement := /-- Complete body including rejecting tails and success cleanup composes the discounted value loop. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.main
+
+attribute [blueprint "frontier:weighted-reader-core"
+  (title := /-- Full reader subtracts 74 operations per actual push -/)
+  (statement := /-- Real prologue, main loop and success return prove (166+470*consumed-74*pushes)*op plus actual retained growth. All original resources and endpoints remain intact. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.f81_core
+
+attribute [blueprint "frontier:weighted-reader"
+  (title := /-- Actual f81 reader receives the exact push-count charge -/)
+  (statement := /-- Trace validity instantiates the full binary reader with the same depth, room, ownership and endpoint claims. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.f81_traced
+
+attribute [blueprint "frontier:weighted-colon-reader"
+  (title := /-- Actual colon wrapper uses the discounted f81 contract -/)
+  (statement := /-- The actual f201 path composes the existing colon reader and full weighted f81. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.f201_traced
+
+attribute [blueprint "frontier:weighted-room-equality"
+  (title := /-- Weighted and original physical room coincide -/)
+  (statement := /-- Structural equality preserves the exact original scratch reserve requirements. This equality explicitly mentions the generic named room interface and is conservatively Conditional. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnWeightedExecution.room_eq
+
+attribute [blueprint "frontier:weighted-heap-equality"
+  (title := /-- Weighted and original heap traces coincide -/)
+  (statement := /-- Structural equality preserves every actual heap transition and endpoint. -/)]
+  WNear.Binary.SerdeIgnWeightedExecution.heapTrace_eq
+
+attribute [blueprint "frontier:weighted-colon-v86"
+  (title := /-- Full 4 MiB room bounds instantiate weighted f201 -/)
+  (statement := /-- Original v86 page bounds and exact room/heap equality instantiate actual f201 under unchanged input/heap ceilings. -/)]
+  WNear.Binary.SerdeIgnExecution.f201_weighted_v86
+
+attribute [blueprint "frontier:weighted-ignore-conditions"
+  (title := /-- Exact discounted phase ignore obligation -/)
+  (statement := /-- For physically reachable phases, provide actual heap ceiling, weighted gas charge and exact returned phase closure. This generic contract remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.WeightedIgnoreConditions
+
+attribute [blueprint "frontier:weighted-ignore-hyp"
+  (title := /-- Weighted actual reader constructs the existing IgnoreHyp -/)
+  (statement := /-- Composes real f201 with exact phase conditions into the original phase IgnoreHyp. Those named generic phase conditions remain unresolved until concretely instantiated. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.ignoreHyp_weighted_v86
+
+attribute [blueprint "frontier:weighted-prefix-gas"
+  (title := /-- Exact discounted reachable-prefix gas obligation -/)
+  (statement := /-- The charge is (166+470*consumed-74*actual trace pushes)*op plus actual retained scratch growth. This generic interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.WeightedIgnoreGasCharges
+
+attribute [blueprint "frontier:weighted-prefix-conditions"
+  (title := /-- Actual prefix supplies weighted phase endpoints -/)
+  (statement := /-- Original ledger heap ceiling, exact value segment and heap trace instantiate closure; the explicitly named weighted gas charge is still required. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.weighted_ignore_conditions
+
+attribute [blueprint "frontier:weighted-selected-cost"
+  (title := /-- Selected discounted cost agrees with every actual witness -/)
+  (statement := /-- Canonical prefix history and deterministic returned trace select the exact lower charge with the actual retained allocator/capacity coordinates. -/)]
+  WNear.Binary.SerdeObjectPrefix.selectedWeightedIgnoreCost_of_witness
+
+attribute [blueprint "frontier:weighted-selected-instance"
+  (title := /-- Concrete selected charge fills weighted gas interface -/)
+  (statement := /-- Actual prefix witness instantiates the weighted ignore gas function for both saved-account states. This does not prove global model funding. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.selected_weighted_ignore_charges
+
+attribute [blueprint "frontier:weighted-object-phase"
+  (title := /-- Actual f228 composes weighted ignore and existing readers -/)
+  (statement := /-- Uses the original generic phase theorem with unchanged bundled key/account readers and the actual weighted IgnoreHyp constructor. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing_bundled_weighted
+
+attribute [blueprint "frontier:weighted-object-loop"
+  (title := /-- Prefix object loop reaches weighted actual f228 -/)
+  (statement := /-- Checked prefix/key/value/closing conditions compose the exact weighted object phase. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.object_loop_bundled_weighted
+
+attribute [blueprint "frontier:weighted-object-wrapper"
+  (title := /-- Actual object wrapper retains discounted charges -/)
+  (statement := /-- Connects weighted actual object execution through the existing wrapper with exact return ownership. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f78_bundled_cost_weighted
+
+attribute [blueprint "frontier:weighted-parser-trait"
+  (title := /-- Actual weighted f66 bundled -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f66_bundled_weighted
+
+attribute [blueprint "frontier:weighted-parser-slice"
+  (title := /-- Actual weighted f65 bundled -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_bundled_weighted
+
+attribute [blueprint "frontier:weighted-parser-room"
+  (title := /-- Actual weighted f65 bundled room -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_bundled_room_weighted
+
+attribute [blueprint "frontier:weighted-parser-call"
+  (title := /-- Actual weighted bundled parser contract -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_parser_contract_weighted
+
+attribute [blueprint "frontier:weighted-parser-family"
+  (title := /-- Actual weighted bundled parser family -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_parser_family_weighted
+
+attribute [blueprint "frontier:weighted-deployed-provider"
+  (title := /-- Actual weighted bundled deployed parser provider -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_deployed_parser_provider_weighted
+
+attribute [blueprint "frontier:weighted-provider-plan"
+  (title := /-- Actual weighted bundled provider plan -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_provider_plan_weighted
+
+attribute [blueprint "frontier:weighted-receipt"
+  (title := /-- Actual weighted bundled refines init -/)
+  (statement := /-- Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_refines_init_weighted
+
+attribute [blueprint "frontier:weighted-selected-receipt"
+  (title := /-- Concrete weighted readers reach full initialized receipt -/)
+  (statement := /-- Instantiates bundled key/account/weighted ignore gas functions and the actual deployed provider. Full unchanged receipt still requires the exact original ProviderModelBudget. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.fully_weighted_bundled_refines_init
+
+attribute [blueprint "frontier:weighted-parser-linear-budget"
+  (title := /-- Remaining weighted whole-input parser inequality -/)
+  (statement := /-- The actual weighted ledgerParserCost must fit 1 trillion+(2215+470*input bytes)*op over the full domain. Frame discounts must fund retained mixed growth; this precise obligation is Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.SelectedWeightedParserLinearBudget
+
+attribute [blueprint "frontier:weighted-linear-receipt"
+  (title := /-- Weighted linear funding composes into full receipt -/)
+  (statement := /-- Original loading/input/storage/host/suffix composition builds ProviderModelBudget from the exact named weighted parser inequality, then checked concrete readers reach full initialized absent-account refinement. This remains Conditional. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.weighted_linear_bundled_refines_init

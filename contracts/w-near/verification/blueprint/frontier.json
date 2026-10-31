@@ -8188,6 +8188,760 @@
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 2779398864,
       "indirect_admission": true
+    },
+    {
+      "id": "weighted-close-dispatch",
+      "declaration": "WNear.Binary.SerdeIgnContainer.dispatch_close_tight",
+      "title": "Actual closing dispatch costs 30 operations",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-dispatch",
+      "notes": "The unchanged binary closing dispatch executes within 30 regular operations; no code, environmental premise or observation changes.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2906730900
+    },
+    {
+      "id": "weighted-close-block",
+      "declaration": "WNear.Binary.SerdeIgnClosing.block_nonempty_tight",
+      "title": "Checked tighter closing block nonempty",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-block",
+      "notes": "Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-dispatch"
+      ],
+      "reviewed_shape_hash": 3424866233
+    },
+    {
+      "id": "weighted-close-empty-block",
+      "declaration": "WNear.Binary.SerdeIgnClosing.block_empty_tight",
+      "title": "Checked tighter closing block empty",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-empty-block",
+      "notes": "Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-dispatch"
+      ],
+      "reviewed_shape_hash": 2142858353
+    },
+    {
+      "id": "weighted-close-step",
+      "declaration": "WNear.Binary.SerdeIgnClosing.iteration_nonempty_tight",
+      "title": "Checked tighter closing iteration nonempty",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-step",
+      "notes": "Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-block"
+      ],
+      "reviewed_shape_hash": 1066664856
+    },
+    {
+      "id": "weighted-close-last-step",
+      "declaration": "WNear.Binary.SerdeIgnClosing.iteration_empty_tight",
+      "title": "Checked tighter closing iteration empty",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-last-step",
+      "notes": "Composes the exact unchanged dispatch and physical pop path; tighter actual work preserves all returned resources and model endpoints.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-empty-block"
+      ],
+      "reviewed_shape_hash": 1034265376
+    },
+    {
+      "id": "weighted-push-bound",
+      "declaration": "WNear.Binary.SerdeIgnWeightedBudget.pushes_le_remaining",
+      "title": "Actual trace pushes fit consumed input",
+      "kind": "theorem",
+      "label": "frontier:weighted-push-bound",
+      "notes": "Derives the number of future frame pushes from the real successful machine run. No abstract bound is assumed.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3816368920
+    },
+    {
+      "id": "weighted-reserve",
+      "declaration": "WNear.Binary.SerdeIgnWeightedBudget.regular_reserve",
+      "title": "Discounted reserve covers actual depth",
+      "kind": "theorem",
+      "label": "frontier:weighted-reserve",
+      "notes": "The weighted potential keeps the 470-byte rate, reserves 184 per depth and discounts 74 per actual frame push. Guards prove natural subtraction does not discard required work.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1883805817
+    },
+    {
+      "id": "weighted-close-funded",
+      "declaration": "WNear.Binary.SerdeIgnClosing.funded_nonempty_weighted",
+      "title": "Weighted reserve funds a real non-final close",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-funded",
+      "notes": "Exact pending trace pop preserves the push discount while releasing the checked depth reserve.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-step"
+      ],
+      "reviewed_shape_hash": 4194122412
+    },
+    {
+      "id": "weighted-close-last-funded",
+      "declaration": "WNear.Binary.SerdeIgnClosing.funded_empty_weighted",
+      "title": "Weighted reserve funds the final close",
+      "kind": "theorem",
+      "label": "frontier:weighted-close-last-funded",
+      "notes": "The empty pending trace returns the same resources with the tighter checked closing cost.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-last-step"
+      ],
+      "reviewed_shape_hash": 2852172185
+    },
+    {
+      "id": "weighted-opening",
+      "declaration": "WNear.Binary.SerdeIgnOpening.entry_funded_weighted",
+      "title": "Actual opening consumes exactly its trace push",
+      "kind": "theorem",
+      "label": "frontier:weighted-opening",
+      "notes": "Physical frame save, scratch growth and model determinism thread the 74-operation discount through the real opening block.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-push-bound"
+      ],
+      "reviewed_shape_hash": 663101060
+    },
+    {
+      "id": "weighted-scalar-entry",
+      "declaration": "WNear.Binary.SerdeIgnValueEntry.pending_entry_weighted",
+      "title": "Scalar entry preserves the weighted reserve",
+      "kind": "theorem",
+      "label": "frontier:weighted-scalar-entry",
+      "notes": "Original 470-per-byte scalar allowance remains unchanged; exact remaining trace supplies the discount and depth guards.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-push-bound"
+      ],
+      "reviewed_shape_hash": 3471170558
+    },
+    {
+      "id": "weighted-object-member",
+      "declaration": "WNear.Binary.SerdeIgnMember.object_traced_weighted",
+      "title": "Actual object member retains the push discount",
+      "kind": "theorem",
+      "label": "frontier:weighted-object-member",
+      "notes": "Real key/string and colon transitions preserve the same future operations and retained scratch history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 393355013
+    },
+    {
+      "id": "weighted-next-member",
+      "declaration": "WNear.Binary.SerdeIgnMember.next_traced_weighted",
+      "title": "Both member branches preserve weighted funding",
+      "kind": "theorem",
+      "label": "frontier:weighted-next-member",
+      "notes": "Actual array and object member paths return the exact value model and discounted reserve.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-object-member"
+      ],
+      "reviewed_shape_hash": 2478022475
+    },
+    {
+      "id": "weighted-next-funded",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.next_funded_weighted",
+      "title": "Checked weighted next member",
+      "kind": "theorem",
+      "label": "frontier:weighted-next-funded",
+      "notes": "The real member transition retains exactly one credit resource and the push count of its returned successful model.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-next-member"
+      ],
+      "reviewed_shape_hash": 285456251
+    },
+    {
+      "id": "weighted-first-funded",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.first_funded_weighted",
+      "title": "Checked weighted first member",
+      "kind": "theorem",
+      "label": "frontier:weighted-first-funded",
+      "notes": "The real member transition retains exactly one credit resource and the push count of its returned successful model.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2717767533
+    },
+    {
+      "id": "weighted-comma-funded",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.comma_funded_weighted",
+      "title": "Checked weighted comma member",
+      "kind": "theorem",
+      "label": "frontier:weighted-comma-funded",
+      "notes": "The real member transition retains exactly one credit resource and the push count of its returned successful model.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1872886090
+    },
+    {
+      "id": "weighted-loop-iteration",
+      "declaration": "WNear.Binary.SerdeIgnWeightedLoop.iteration",
+      "title": "Actual container iteration uses the weighted frontier",
+      "kind": "theorem",
+      "label": "frontier:weighted-loop-iteration",
+      "notes": "Composes checked close, first and comma transitions over the same binary iteration and exact model.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-close-funded",
+        "weighted-close-last-funded",
+        "weighted-first-funded",
+        "weighted-comma-funded"
+      ],
+      "reviewed_shape_hash": 3996420497
+    },
+    {
+      "id": "weighted-loop",
+      "declaration": "WNear.Binary.SerdeIgnWeightedLoop.loop",
+      "title": "Actual container loop retains frame savings",
+      "kind": "theorem",
+      "label": "frontier:weighted-loop",
+      "notes": "Checked loop invariant follows actual remaining input, depth and trace pushes without duplicating credits.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-loop-iteration"
+      ],
+      "reviewed_shape_hash": 1895196770
+    },
+    {
+      "id": "weighted-loop-phase",
+      "declaration": "WNear.Binary.SerdeIgnWeightedLoop.phase",
+      "title": "Weighted container phase reaches its callers",
+      "kind": "theorem",
+      "label": "frontier:weighted-loop-phase",
+      "notes": "The actual exit/error tail composes the weighted loop and preserves all rejected tails.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-loop"
+      ],
+      "reviewed_shape_hash": 2408877798
+    },
+    {
+      "id": "weighted-loop-suffix",
+      "declaration": "WNear.Binary.SerdeIgnWeightedLoop.suffix",
+      "title": "Weighted phase composes into the actual member suffix",
+      "kind": "theorem",
+      "label": "frontier:weighted-loop-suffix",
+      "notes": "Real phase and member paths return the precise pending value model and ownership.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-loop-phase",
+        "weighted-next-funded"
+      ],
+      "reviewed_shape_hash": 3655579170
+    },
+    {
+      "id": "weighted-decoded-suffix",
+      "declaration": "WNear.Binary.SerdeIgnWeightedLoop.decoded_suffix",
+      "title": "Weighted suffix is the deployed instruction slice",
+      "kind": "theorem",
+      "label": "frontier:weighted-decoded-suffix",
+      "notes": "The checked binary slice identity connects the weighted suffix proof to the deployed reader.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-loop-suffix"
+      ],
+      "reviewed_shape_hash": 1869781659
+    },
+    {
+      "id": "weighted-opening-stack",
+      "declaration": "WNear.Binary.SerdeIgnValueEntry.opening_entry128_weighted",
+      "title": "Opening adapts to the actual reader stack",
+      "kind": "theorem",
+      "label": "frontier:weighted-opening-stack",
+      "notes": "Retains the exact scratch state and one credit resource while composing the weighted opening.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-opening"
+      ],
+      "reviewed_shape_hash": 1483746347
+    },
+    {
+      "id": "weighted-value-continuation",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.continue_suffix",
+      "title": "Actual reader continuation carries discounted work",
+      "kind": "theorem",
+      "label": "frontier:weighted-value-continuation",
+      "notes": "Composes the weighted opening stack and decoded suffix with exact heap/model endpoints.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-loop-suffix"
+      ],
+      "reviewed_shape_hash": 192970887
+    },
+    {
+      "id": "weighted-value-iteration",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.value_iteration",
+      "title": "Actual value iteration handles scalar and container paths",
+      "kind": "theorem",
+      "label": "frontier:weighted-value-iteration",
+      "notes": "Unchanged scalar blocks and weighted container continuation preserve the exact successful model.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-value-continuation",
+        "weighted-scalar-entry"
+      ],
+      "reviewed_shape_hash": 166948127
+    },
+    {
+      "id": "weighted-value-loop",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.value_loop",
+      "title": "Actual value loop accumulates trace discounts",
+      "kind": "theorem",
+      "label": "frontier:weighted-value-loop",
+      "notes": "The complete real loop retains the selected trace push discount and physical heap history.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-value-iteration"
+      ],
+      "reviewed_shape_hash": 335138733
+    },
+    {
+      "id": "weighted-main",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.main",
+      "title": "Actual main reader funds its full suffix",
+      "kind": "theorem",
+      "label": "frontier:weighted-main",
+      "notes": "Complete body including rejecting tails and success cleanup composes the discounted value loop.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-value-loop"
+      ],
+      "reviewed_shape_hash": 2402434846
+    },
+    {
+      "id": "weighted-reader-core",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.f81_core",
+      "title": "Full reader subtracts 74 operations per actual push",
+      "kind": "theorem",
+      "label": "frontier:weighted-reader-core",
+      "notes": "Real prologue, main loop and success return prove (166+470*consumed-74*pushes)*op plus actual retained growth. All original resources and endpoints remain intact.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-main"
+      ],
+      "reviewed_shape_hash": 1534307459
+    },
+    {
+      "id": "weighted-reader",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.f81_traced",
+      "title": "Actual f81 reader receives the exact push-count charge",
+      "kind": "theorem",
+      "label": "frontier:weighted-reader",
+      "notes": "Trace validity instantiates the full binary reader with the same depth, room, ownership and endpoint claims.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-reader-core"
+      ],
+      "reviewed_shape_hash": 1982885091
+    },
+    {
+      "id": "weighted-colon-reader",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.f201_traced",
+      "title": "Actual colon wrapper uses the discounted f81 contract",
+      "kind": "theorem",
+      "label": "frontier:weighted-colon-reader",
+      "notes": "The actual f201 path composes the existing colon reader and full weighted f81.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "weighted-reader"
+      ],
+      "reviewed_shape_hash": 1092941630
+    },
+    {
+      "id": "weighted-room-equality",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.room_eq",
+      "title": "Weighted and original physical room coincide",
+      "kind": "theorem",
+      "label": "frontier:weighted-room-equality",
+      "notes": "Structural equality preserves the exact original scratch reserve requirements. This equality explicitly mentions the generic named room interface and is conservatively Conditional.",
+      "required_type_dependencies": [
+        "ignored-trace-room",
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1514163802
+    },
+    {
+      "id": "weighted-heap-equality",
+      "declaration": "WNear.Binary.SerdeIgnWeightedExecution.heapTrace_eq",
+      "title": "Weighted and original heap traces coincide",
+      "kind": "theorem",
+      "label": "frontier:weighted-heap-equality",
+      "notes": "Structural equality preserves every actual heap transition and endpoint.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 433054526
+    },
+    {
+      "id": "weighted-colon-v86",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f201_weighted_v86",
+      "title": "Full 4 MiB room bounds instantiate weighted f201",
+      "kind": "theorem",
+      "label": "frontier:weighted-colon-v86",
+      "notes": "Original v86 page bounds and exact room/heap equality instantiate actual f201 under unchanged input/heap ceilings.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-colon-reader",
+        "weighted-room-equality",
+        "weighted-heap-equality"
+      ],
+      "reviewed_shape_hash": 2038800511
+    },
+    {
+      "id": "weighted-ignore-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.WeightedIgnoreConditions",
+      "title": "Exact discounted phase ignore obligation",
+      "kind": "verification_contract",
+      "label": "frontier:weighted-ignore-conditions",
+      "notes": "For physically reachable phases, provide actual heap ceiling, weighted gas charge and exact returned phase closure. This generic contract remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 6188388404778577355
+    },
+    {
+      "id": "weighted-ignore-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.ignoreHyp_weighted_v86",
+      "title": "Weighted actual reader constructs the existing IgnoreHyp",
+      "kind": "theorem",
+      "label": "frontier:weighted-ignore-hyp",
+      "notes": "Composes real f201 with exact phase conditions into the original phase IgnoreHyp. Those named generic phase conditions remain unresolved until concretely instantiated.",
+      "required_type_dependencies": [
+        "phase-ignore-hyp",
+        "weighted-ignore-conditions"
+      ],
+      "required_proof_dependencies": [
+        "weighted-colon-v86"
+      ],
+      "reviewed_shape_hash": 608623359
+    },
+    {
+      "id": "weighted-prefix-gas",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.WeightedIgnoreGasCharges",
+      "title": "Exact discounted reachable-prefix gas obligation",
+      "kind": "verification_contract",
+      "label": "frontier:weighted-prefix-gas",
+      "notes": "The charge is (166+470*consumed-74*actual trace pushes)*op plus actual retained scratch growth. This generic interface remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 5484465426706572423
+    },
+    {
+      "id": "weighted-prefix-conditions",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.weighted_ignore_conditions",
+      "title": "Actual prefix supplies weighted phase endpoints",
+      "kind": "theorem",
+      "label": "frontier:weighted-prefix-conditions",
+      "notes": "Original ledger heap ceiling, exact value segment and heap trace instantiate closure; the explicitly named weighted gas charge is still required.",
+      "required_type_dependencies": [
+        "weighted-ignore-conditions",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3149056308
+    },
+    {
+      "id": "weighted-selected-cost",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selectedWeightedIgnoreCost_of_witness",
+      "title": "Selected discounted cost agrees with every actual witness",
+      "kind": "theorem",
+      "label": "frontier:weighted-selected-cost",
+      "notes": "Canonical prefix history and deterministic returned trace select the exact lower charge with the actual retained allocator/capacity coordinates.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignore-witness-history"
+      ],
+      "reviewed_shape_hash": 2844460400
+    },
+    {
+      "id": "weighted-selected-instance",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.selected_weighted_ignore_charges",
+      "title": "Concrete selected charge fills weighted gas interface",
+      "kind": "theorem",
+      "label": "frontier:weighted-selected-instance",
+      "notes": "Actual prefix witness instantiates the weighted ignore gas function for both saved-account states. This does not prove global model funding.",
+      "required_type_dependencies": [
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-selected-cost"
+      ],
+      "reviewed_shape_hash": 3229716983
+    },
+    {
+      "id": "weighted-object-phase",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing_bundled_weighted",
+      "title": "Actual f228 composes weighted ignore and existing readers",
+      "kind": "theorem",
+      "label": "frontier:weighted-object-phase",
+      "notes": "Uses the original generic phase theorem with unchanged bundled key/account readers and the actual weighted IgnoreHyp constructor.",
+      "required_type_dependencies": [
+        "bundled-key-conditions",
+        "prefix-reader-close-conditions",
+        "prefix-reader-value-conditions",
+        "weighted-ignore-conditions"
+      ],
+      "required_proof_dependencies": [
+        "weighted-ignore-hyp"
+      ],
+      "reviewed_shape_hash": 2576093956
+    },
+    {
+      "id": "weighted-object-loop",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.object_loop_bundled_weighted",
+      "title": "Prefix object loop reaches weighted actual f228",
+      "kind": "theorem",
+      "label": "frontier:weighted-object-loop",
+      "notes": "Checked prefix/key/value/closing conditions compose the exact weighted object phase.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "object-ledger-setup",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-object-phase",
+        "weighted-prefix-conditions"
+      ],
+      "reviewed_shape_hash": 2454614952
+    },
+    {
+      "id": "weighted-object-wrapper",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f78_bundled_cost_weighted",
+      "title": "Actual object wrapper retains discounted charges",
+      "kind": "theorem",
+      "label": "frontier:weighted-object-wrapper",
+      "notes": "Connects weighted actual object execution through the existing wrapper with exact return ownership.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "object-ledger-setup",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-object-loop"
+      ],
+      "reviewed_shape_hash": 3404806580
+    },
+    {
+      "id": "weighted-parser-trait",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f66_bundled_weighted",
+      "title": "Actual weighted f66 bundled",
+      "kind": "theorem",
+      "label": "frontier:weighted-parser-trait",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "object-ledger-setup",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-object-wrapper"
+      ],
+      "reviewed_shape_hash": 3823785374
+    },
+    {
+      "id": "weighted-parser-slice",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_bundled_weighted",
+      "title": "Actual weighted f65 bundled",
+      "kind": "theorem",
+      "label": "frontier:weighted-parser-slice",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "object-ledger-setup",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-parser-trait"
+      ],
+      "reviewed_shape_hash": 3852368589
+    },
+    {
+      "id": "weighted-parser-room",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_bundled_room_weighted",
+      "title": "Actual weighted f65 bundled room",
+      "kind": "theorem",
+      "label": "frontier:weighted-parser-room",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "lookup-heap-room",
+        "object-ledger-setup",
+        "parser-fixed-result",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-parser-slice"
+      ],
+      "reviewed_shape_hash": 1877570107
+    },
+    {
+      "id": "weighted-parser-call",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_parser_contract_weighted",
+      "title": "Actual weighted bundled parser contract",
+      "kind": "theorem",
+      "label": "frontier:weighted-parser-call",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "object-ledger-setup",
+        "parser-call-contract",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-parser-room"
+      ],
+      "reviewed_shape_hash": 523278971
+    },
+    {
+      "id": "weighted-parser-family",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_parser_family_weighted",
+      "title": "Actual weighted bundled parser family",
+      "kind": "theorem",
+      "label": "frontier:weighted-parser-family",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "parser-family",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-parser-call"
+      ],
+      "reviewed_shape_hash": 724551649
+    },
+    {
+      "id": "weighted-deployed-provider",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_deployed_parser_provider_weighted",
+      "title": "Actual weighted bundled deployed parser provider",
+      "kind": "theorem",
+      "label": "frontier:weighted-deployed-provider",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "deployed-parser-provider",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-parser-family"
+      ],
+      "reviewed_shape_hash": 3796870507
+    },
+    {
+      "id": "weighted-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_provider_plan_weighted",
+      "title": "Actual weighted bundled provider plan",
+      "kind": "theorem",
+      "label": "frontier:weighted-provider-plan",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "absent-parser-plan",
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "provider-model-budget",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-deployed-provider"
+      ],
+      "reviewed_shape_hash": 2847751560
+    },
+    {
+      "id": "weighted-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_refines_init_weighted",
+      "title": "Actual weighted bundled refines init",
+      "kind": "theorem",
+      "label": "frontier:weighted-receipt",
+      "notes": "Composes the checked discounted parser route with the original runtime interface and gas/receipt claims. Exact named gas, model, environment and domain premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "provider-model-budget",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "weighted-provider-plan"
+      ],
+      "reviewed_shape_hash": 1807636342
+    },
+    {
+      "id": "weighted-selected-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.fully_weighted_bundled_refines_init",
+      "title": "Concrete weighted readers reach full initialized receipt",
+      "kind": "theorem",
+      "label": "frontier:weighted-selected-receipt",
+      "notes": "Instantiates bundled key/account/weighted ignore gas functions and the actual deployed provider. Full unchanged receipt still requires the exact original ProviderModelBudget.",
+      "required_type_dependencies": [
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "weighted-receipt",
+        "weighted-selected-instance"
+      ],
+      "reviewed_shape_hash": 2050490928
+    },
+    {
+      "id": "weighted-parser-linear-budget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.SelectedWeightedParserLinearBudget",
+      "title": "Remaining weighted whole-input parser inequality",
+      "kind": "verification_contract",
+      "label": "frontier:weighted-parser-linear-budget",
+      "notes": "The actual weighted ledgerParserCost must fit 1 trillion+(2215+470*input bytes)*op over the full domain. Frame discounts must fund retained mixed growth; this precise obligation is Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 14455168037869278536
+    },
+    {
+      "id": "weighted-linear-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.weighted_linear_bundled_refines_init",
+      "title": "Weighted linear funding composes into full receipt",
+      "kind": "theorem",
+      "label": "frontier:weighted-linear-receipt",
+      "notes": "Original loading/input/storage/host/suffix composition builds ProviderModelBudget from the exact named weighted parser inequality, then checked concrete readers reach full initialized absent-account refinement. This remains Conditional.",
+      "required_type_dependencies": [
+        "weighted-parser-linear-budget"
+      ],
+      "required_proof_dependencies": [
+        "provider-budget-from-linear",
+        "weighted-selected-receipt"
+      ],
+      "reviewed_shape_hash": 3692446522
     }
   ],
   "reviewed_environment": [

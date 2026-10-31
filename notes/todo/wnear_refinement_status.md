@@ -33,6 +33,50 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: weighted actual reader reaches the full receipt
+
+The unchanged binary closing dispatch costs 30 regular operations. Checked actual
+closing paths use that saving to support a weighted reserve: the same 470-per-byte
+allowance, a depth reserve of 184 operations, and a discount of 74 operations for
+each actual future frame push. Push bounds derive from successful machine runs;
+scalar contracts are unchanged. The full actual f81 and f201 execution proofs,
+including prologue, rejecting tails and success cleanup, now check the charge
+(166+470*consumed-74*actualPushes)*op plus the exact retained scratch extraCost.
+All ownership invariants retain one credit resource. Physical room and heap trace
+are checked equal to the original contracts; no heap ceiling or cost is weakened.
+
+WeightedIgnoreConditions and WeightedIgnoreGasCharges name the exact generic
+phase and reachable-prefix interfaces. Their generic obligations remain Open.
+Actual selected prefix witnesses instantiate the discounted ignore gas function
+for both saved-account states. The existing bundled key/account readers compose
+with that actual weighted IgnoreHyp through f228, f78, f66, f65 and the deployed
+parser provider into the original initialized absent-account receipt claims.
+These checked constructor/composition results remain Conditional where their
+named verification premises are required. They do not silently prove the generic
+IgnoreHyp, KeyConditions or ValueConditions interfaces.
+
+SelectedWeightedParserLinearBudget precisely names the remaining full-input
+inequality for this concrete selected charge. Under that premise, the existing
+loading/input/storage/host/suffix proof constructs the unchanged original
+ProviderModelBudget and reaches the full receipt. This route is Integrated through
+checked callers, but its whole-input funding obligation remains Open. The prior
+small general-object case and its original global integration remain intact.
+No original statement, direct/transitive admission frontier, axiom allowance,
+protocol premise, gas budget or full 4 MiB goal changes at this checkpoint.
+
+Next: prove the actual weighted trace sum and amortize retained mixed growth
+using frame-push discounts and copied-key slack over the full input domain, then
+instantiate the named weighted linear budget. Accepted-JSON/model connection,
+other states/methods and concrete protocol premises remain unresolved. Full
+completion still requires deployed-binary refinement with no sorryAx.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T15:04:15+00:00 for proof source `cdfa927a5ba98366d3c63378f3b4ffbf4f0fdc5020d7a4d5115cfa73425af786`. All 113 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical. The exact direct/transitive admission frontier and the
+Proofs.Refinement module allowance remain unchanged. Live publication must match
+this source and evidence.
+
 ## Continuation on 2026-10-31: exact selected trace reaches global callers
 
 The original costObj recurrence now equals traceCost over the complete actual

@@ -665,6 +665,47 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_weighted_reader_reaches_receipt_with_explicit_open_budget(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['weighted-heap-equality', 'weighted-colon-v86',
+                     'weighted-selected-cost']:
+            self.assertEqual(result[node]['status'], 'Proven')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['weighted-ignore-conditions', 'weighted-prefix-gas', 'weighted-parser-linear-budget',
+                     'ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-complement']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['weighted-reader-core', 'weighted-reader', 'weighted-colon-reader',
+                     'weighted-room-equality', 'weighted-ignore-hyp', 'weighted-selected-instance', 'weighted-object-loop',
+                     'weighted-deployed-provider', 'weighted-provider-plan', 'weighted-receipt',
+                     'weighted-selected-receipt', 'weighted-linear-receipt', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for source, caller in [('weighted-reader', 'weighted-colon-reader'),
+                               ('weighted-colon-reader', 'weighted-colon-v86'),
+                               ('weighted-selected-instance', 'weighted-selected-receipt'),
+                               ('weighted-selected-receipt', 'weighted-linear-receipt')]:
+            self.assertIn(caller, [x['id'] for x in result[source]['integrated_into']])
+
+    def test_weighted_receipt_cannot_skip_concrete_ignore_instance(self):
+        self.by_id['weighted-selected-receipt']['proof_dependencies'].remove(self.nodes['weighted-selected-instance']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_weighted_linear_receipt_cannot_hide_its_budget(self):
+        self.by_id['weighted-linear-receipt']['type_dependencies'].remove(self.nodes['weighted-parser-linear-budget']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness|verification hypotheses'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_weighted_provider_cannot_skip_actual_parser_family(self):
+        self.by_id['weighted-deployed-provider']['proof_dependencies'].remove(self.nodes['weighted-parser-family']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_weighted_room_conversion_must_keep_exact_heap_trace(self):
+        self.by_id['weighted-colon-v86']['proof_dependencies'].remove(self.nodes['weighted-heap-equality']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
