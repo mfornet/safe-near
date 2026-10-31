@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeIgnLoop
 import Bridge.Functions.ScratchMixedTrace
 import Bridge.Functions.SerdeIgnMachineTrace
 import Bridge.Functions.SerdeKeyArgumentGas
@@ -1849,3 +1850,38 @@ attribute [blueprint "frontier:ignore-machine-trace-budget"
   (title := /-- Existing ignored-value budget composes from mixed reserve -/)
   (statement := /-- The old successful ignored-value trace budget is now a checked specialization of the mixed reserve, preserving its original statement and allowance. -/)]
   WNear.Binary.SerdeIgnMachineTrace.trace_budget
+
+attribute [blueprint "frontier:ignored-pop-prefix"
+  (title := /-- Real pops retain the exact original trace prefix -/)
+  (statement := /-- Extends the exact removed-frame prefix and its false-operation prefix after one saved-frame pop. Initialization is checked inside the loop proof. -/)]
+  WNear.Binary.SerdeIgnLoop.Pops.step
+
+attribute [blueprint "frontier:ignored-container-iteration"
+  (title := /-- Shared invariant for the actual container iteration -/)
+  (statement := /-- Composes nested/final close and first/comma iteration proofs. Retains actual saved-frame contents, cursor, remaining trace, allocator state and single gas-credit ownership. -/)]
+  WNear.Binary.SerdeIgnLoop.iteration
+
+attribute [blueprint "frontier:ignored-container-loop"
+  (title := /-- Complete actual ignored-container loop -/)
+  (statement := /-- The real loop consumes one entry charge, establishes its invariant from a successful pure-machine continuation, and preserves exact pop prefixes. Its checked exits are first-member, comma-member or final success. This is not the outer value loop. -/)]
+  WNear.Binary.SerdeIgnLoop.loop
+
+attribute [blueprint "frontier:ignored-container-phase"
+  (title := /-- Actual container block retains its rejecting tail -/)
+  (statement := /-- Composes the complete loop with the real enclosing block and post-loop guard. Every successful path bypasses the unchanged rejecting bytecode and establishes a member continuation or the actual success branch. -/)]
+  WNear.Binary.SerdeIgnLoop.phase
+
+attribute [blueprint "frontier:ignored-suffix-code"
+  (title := /-- Container/member suffix is exact deployed bytecode -/)
+  (statement := /-- Kernel equality identifies the composed suffix with all actual decoded function-81 value-loop instructions after its successful value-dispatch prefix. -/)]
+  WNear.Binary.SerdeIgnLoop.suffixCode_at
+
+attribute [blueprint "frontier:ignored-container-suffix"
+  (title := /-- Container and full member path compose to the next value -/)
+  (statement := /-- The full actual container/member suffix composes through the funded array/key/colon path. It enters the next value loop or takes the real success branch, preserving exact remaining trace, cursor, caller resources and retained allocation. -/)]
+  WNear.Binary.SerdeIgnLoop.suffix
+
+attribute [blueprint "frontier:ignored-decoded-suffix"
+  (title := /-- Suffix contract is connected to deployed function 81 -/)
+  (statement := /-- Uses checked equality to apply the container/member suffix contract directly to the actual decoded function body. Full value-entry/outer-loop/cleanup composition, growth room, original full-method gas and IgnoreHyp remain unresolved. -/)]
+  WNear.Binary.SerdeIgnLoop.decoded_suffix

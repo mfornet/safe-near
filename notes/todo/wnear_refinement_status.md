@@ -33,6 +33,41 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: complete ignored-container Wasm loop
+
+`SerdeIgnLoop` composes the already checked nested/final closing and first/comma
+iterations into the complete actual container loop. Its single-credit invariant
+starts from the successful pure-machine continuation and actual owned resources.
+It retains the saved-frame bytes, cursor, exact remaining operation trace and
+unchanged scratch allocation, allocator bound and live blocks. `Pops` records
+exactly which original frame and false-operation prefixes the real pops remove.
+The initial instance and every back edge are checked; gas ownership is carried
+once and loop entry/back-edge charges are paid.
+
+The real enclosing container block retains its complete rejecting tail. Its
+successful paths bypass that tail through checked control-flow composition.
+The full funded array/key/colon member path then establishes the next value-loop
+entry, or the container block takes the actual success branch. The final public
+suffix contract is rewritten through a kernel equality to the exact decoded
+function-81 body, rather than relying on a prose identification of code.
+
+The existing closing/member results are now Integrated into iteration, loop,
+container-block and decoded-suffix contracts. These results are Proven under
+their explicit owned-resource and successful-model premises. They do not claim
+that the complete f81 method has run: value-entry composition, the outer value
+loop, prologue/cleanup and concrete growth-room instantiation remain to be
+assembled. `IgnoreHyp`, KeyConditions, ValueConditions, escaped-string room,
+the general deployed parser/gas witness and pinned protocol obligations remain
+Open; the global and full ft_balance_of results remain Conditional. The next
+proof frontier is the value-mode invariant and its opening/scalar handoffs.
+
+Strict full audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T07:05:59+00:00 for proof source `94065f421e584a73835dd681272d356ee2f3737acb28d6169677541c15d73459`. All 48 frontier
+policy tests, Lean style and toolchain checks passed. All old statement pins
+remain byte-identical; the actual loop/suffix interfaces are pinned additively.
+No axiom/admission allowance, model observation or reviewed environmental
+premise was expanded. Publication also requires matching served evidence.
+
 ## Continuation on 2026-10-31: mixed string/frame scratch composition
 
 `ScratchMixedTrace` composes string-append batches with ignored-container

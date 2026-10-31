@@ -374,10 +374,12 @@
         "ignored-scalar",
         "ignored-depth",
         "ignored-reserve",
-        "scratch-room"
+        "scratch-room",
+        "ignored-decoded-suffix"
       ],
       "label": "frontier:ignore-hyp",
-      "reviewed_shape_hash": 14658794859049893487
+      "reviewed_shape_hash": 14658794859049893487,
+      "notes": "The complete actual container/member suffix is checked. The outer value loop, value-entry composition, cleanup and concrete growth-room instances remain unresolved; this interface stays Open."
     },
     {
       "id": "key-conditions",
@@ -4152,6 +4154,92 @@
         "scratch-mixed-frame-domination"
       ],
       "reviewed_shape_hash": 3102320834
+    },
+    {
+      "id": "ignored-pop-prefix",
+      "declaration": "WNear.Binary.SerdeIgnLoop.Pops.step",
+      "title": "Real pops retain the exact original trace prefix",
+      "kind": "theorem",
+      "label": "frontier:ignored-pop-prefix",
+      "notes": "Extends the exact removed-frame prefix and its false-operation prefix after one saved-frame pop. Initialization is checked inside the loop proof.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1600028741
+    },
+    {
+      "id": "ignored-container-iteration",
+      "declaration": "WNear.Binary.SerdeIgnLoop.iteration",
+      "title": "Shared invariant for the actual container iteration",
+      "kind": "theorem",
+      "label": "frontier:ignored-container-iteration",
+      "notes": "Composes nested/final close and first/comma iteration proofs. Retains actual saved-frame contents, cursor, remaining trace, allocator state and single gas-credit ownership.",
+      "required_proof_dependencies": [
+        "ignored-closing",
+        "ignored-last-close",
+        "ignored-first",
+        "ignored-comma",
+        "ignored-pop-prefix"
+      ],
+      "reviewed_shape_hash": 3754026460
+    },
+    {
+      "id": "ignored-container-loop",
+      "declaration": "WNear.Binary.SerdeIgnLoop.loop",
+      "title": "Complete actual ignored-container loop",
+      "kind": "theorem",
+      "label": "frontier:ignored-container-loop",
+      "notes": "The real loop consumes one entry charge, establishes its invariant from a successful pure-machine continuation, and preserves exact pop prefixes. Its checked exits are first-member, comma-member or final success. This is not the outer value loop.",
+      "required_proof_dependencies": [
+        "ignored-container-iteration"
+      ],
+      "reviewed_shape_hash": 568438166
+    },
+    {
+      "id": "ignored-container-phase",
+      "declaration": "WNear.Binary.SerdeIgnLoop.phase",
+      "title": "Actual container block retains its rejecting tail",
+      "kind": "theorem",
+      "label": "frontier:ignored-container-phase",
+      "notes": "Composes the complete loop with the real enclosing block and post-loop guard. Every successful path bypasses the unchanged rejecting bytecode and establishes a member continuation or the actual success branch.",
+      "required_proof_dependencies": [
+        "ignored-container-loop"
+      ],
+      "reviewed_shape_hash": 39876157
+    },
+    {
+      "id": "ignored-suffix-code",
+      "declaration": "WNear.Binary.SerdeIgnLoop.suffixCode_at",
+      "title": "Container/member suffix is exact deployed bytecode",
+      "kind": "theorem",
+      "label": "frontier:ignored-suffix-code",
+      "notes": "Kernel equality identifies the composed suffix with all actual decoded function-81 value-loop instructions after its successful value-dispatch prefix.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1538495628
+    },
+    {
+      "id": "ignored-container-suffix",
+      "declaration": "WNear.Binary.SerdeIgnLoop.suffix",
+      "title": "Container and full member path compose to the next value",
+      "kind": "theorem",
+      "label": "frontier:ignored-container-suffix",
+      "notes": "The full actual container/member suffix composes through the funded array/key/colon path. It enters the next value loop or takes the real success branch, preserving exact remaining trace, cursor, caller resources and retained allocation.",
+      "required_proof_dependencies": [
+        "ignored-container-phase",
+        "ignored-member"
+      ],
+      "reviewed_shape_hash": 873529303
+    },
+    {
+      "id": "ignored-decoded-suffix",
+      "declaration": "WNear.Binary.SerdeIgnLoop.decoded_suffix",
+      "title": "Suffix contract is connected to deployed function 81",
+      "kind": "theorem",
+      "label": "frontier:ignored-decoded-suffix",
+      "notes": "Uses checked equality to apply the container/member suffix contract directly to the actual decoded function body. Full value-entry/outer-loop/cleanup composition, growth room, original full-method gas and IgnoreHyp remain unresolved.",
+      "required_proof_dependencies": [
+        "ignored-container-suffix",
+        "ignored-suffix-code"
+      ],
+      "reviewed_shape_hash": 1848788969
     }
   ],
   "reviewed_environment": [

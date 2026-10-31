@@ -8372,6 +8372,420 @@ theorem WNear.Binary.SerdeFromTraitModel.f66_arr_model {GF : Iris.BundledGFuncto
                                       value.toUTF8.toList (j + 1) p c len)
 ```
 
+## Bridge.Functions.SerdeIgnLoop
+
+`WNear.Binary.SerdeIgnLoop.Pops` (hash `755761a0259617a3`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.Pops (initial frames : List UInt8) (original ops : List WNear.Binary.SerdeIgnTrace.Op) : Prop :=
+  ∃ popped, initial = popped ++ frames ∧ original = List.replicate popped.length false ++ ops
+```
+
+`WNear.Binary.SerdeIgnLoop.Pops.refl` (hash `00000000a73721ed`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.Pops.refl (frames : List UInt8) (ops : List WNear.Binary.SerdeIgnTrace.Op) :
+  WNear.Binary.SerdeIgnLoop.Pops frames frames ops ops
+```
+
+`WNear.Binary.SerdeIgnLoop.Pops.step` (hash `000000005f5e8045`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.Pops.step {initial frames : List UInt8} {saved : UInt8}
+  {original ops : List WNear.Binary.SerdeIgnTrace.Op}
+  (h : WNear.Binary.SerdeIgnLoop.Pops initial (saved :: frames) original (false :: ops)) :
+  WNear.Binary.SerdeIgnLoop.Pops initial frames original ops
+```
+
+`WNear.Binary.SerdeIgnLoop.caller` (hash `acfbbae08556ba3c`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.caller {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (n g : ℕ)
+  (gt : Wasm.GlobalType) (s : UInt32) (Fr : Iris.IProp GF) : Iris.IProp GF :=
+  fun Fr =>
+    iprop(g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+        WNear.Binary.VecFromElem.stk n (s.toNat - 128) 128 ∗
+          n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+            n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗ Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.decoded_suffix` (hash `000000006e3247e9`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.decoded_suffix {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 15 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (frames bs r : List UInt8)
+  (ops : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) (i N : ℕ) (opened : Bool) (current : UInt8)
+  (l4 l6 l7 : UInt32) (l5 : UInt64) (hs : s.toNat + 32 ≤ 2 ^ 32) (hstack : 128 ≤ s.toNat) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hlen : bs.length + 16 < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hcurrent : WNear.IgnoreModel.Br current)
+  (hframes : ∀ f ∈ frames, WNear.IgnoreModel.Br f) (hi : i ≤ bs.length)
+  (hmodel :
+    WNear.Binary.SerdeIgnMachineTrace.run WNear.IgnoreModel.vSkip WNear.Binary.SerdeIgnMachineTrace.keyBody (N + 1)
+        (if opened = true then WNear.IgnoreModel.Mode.opened current else WNear.IgnoreModel.Mode.cont current) frames
+        (List.drop i bs) =
+      some (r, ops)) :
+  WNear.Binary.SerdeIgnMember.code n maxP inst mi A ∗
+      NearLogic.credits Cg
+          (2 * cfg.regularOpCost +
+            (WNear.Binary.SerdeIgnBudget.regular cfg
+                  (if opened = true then WNear.Binary.SerdeIgnBudget.openedAllowance current else 0)
+                  (bs.length - r.length - i) (frames.length + 1) +
+                WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+              R)) ∗
+        WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames
+          (WNear.Binary.SerdeIgnLoop.caller n g gt s Fr) ⊢
+    NearLogic.mwpi cfg lim d
+      (WNear.Binary.SerdeIgnValue.fr81 inst mi de s (if opened = true then 0 else 1) l4 l5 l6 l7 current.toUInt32) []
+      (List.drop 3 (WNear.Binary.SerdeIgnSegments.bodyAt WNear.Binary.f81.body [14, 0, 0, 0]))
+      (WNear.Binary.SerdeIgnLoop.suffixPost cfg inst mi n g Cg R gt s de ptr p cap maxP hl F live frames bs r ops Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.errorTail` (hash `aff57f21c5226165`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.errorTail : List Wasm.Instr :=
+  List.drop 6 (WNear.Binary.SerdeIgnSegments.bodyAt WNear.Binary.f81.body [14, 0, 0, 0, 3])
+```
+
+`WNear.Binary.SerdeIgnLoop.invariant` (hash `292f6e3f16cb72ae`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.invariant {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n Cg R : ℕ) (s de ptr p cap : UInt32) (maxP hl F : ℕ)
+  (live : List (ℕ × ℕ)) (initial bs r : List UInt8) (original : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF)
+  (vs : List Wasm.Value) (fr : WasmLogic.Frame) : Iris.IProp GF :=
+  fun fr =>
+    iprop(∃ i N opened current frames ops l4 l6 l7 l5,
+        ⌜vs = [] ∧
+              fr =
+                  WNear.Binary.SerdeIgnValue.fr81 inst mi de s (if opened = true then 0 else 1) l4
+                    l5 l6 l7 current.toUInt32 ∧
+                WNear.IgnoreModel.Br current ∧
+                  (∀ f ∈ frames, WNear.IgnoreModel.Br f) ∧
+                    i ≤ bs.length ∧
+                      WNear.Binary.SerdeIgnLoop.Pops initial frames original ops ∧
+                        WNear.Binary.SerdeIgnMachineTrace.run WNear.IgnoreModel.vSkip
+                            WNear.Binary.SerdeIgnMachineTrace.keyBody (N + 1)
+                            (if opened = true then WNear.IgnoreModel.Mode.opened current
+                            else WNear.IgnoreModel.Mode.cont current)
+                            frames (List.drop i bs) =
+                          some (r, ops)⌝ ∗
+          NearLogic.credits Cg
+              (WNear.Binary.SerdeIgnBudget.regular cfg
+                    (if opened = true then WNear.Binary.SerdeIgnBudget.openedAllowance current
+                    else 0)
+                    (bs.length - r.length - i) (frames.length + 1) +
+                  WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+                R) ∗
+            WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.iteration` (hash `00000000dfc1e5dc`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.iteration {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth) (Cg R : ℕ)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (initial bs r : List UInt8)
+  (original : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) (hs : s.toNat + 32 ≤ 2 ^ 32)
+  (hde : de.toNat + 24 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32)
+  (vs : List Wasm.Value) (fr : WasmLogic.Frame) :
+  WNear.Binary.SerdeIgnMember.code n maxP inst mi A ∗
+      WNear.Binary.SerdeIgnLoop.invariant cfg inst mi n Cg R s de ptr p cap maxP hl F live initial bs r original Fr vs
+        fr ⊢
+    NearLogic.mwpi cfg lim d fr vs WNear.Binary.SerdeIgnClosing.iterationCode
+      (NearLogic.Post.mloop cfg Cg 0 []
+        (WNear.Binary.SerdeIgnLoop.invariant cfg inst mi n Cg R s de ptr p cap maxP hl F live initial bs r original Fr)
+        (WNear.Binary.SerdeIgnLoop.post cfg inst mi n Cg R s de ptr p cap maxP hl F live initial bs r original Fr))
+```
+
+`WNear.Binary.SerdeIgnLoop.loop` (hash `0000000021e1ad96`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.loop {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth) (Cg R : ℕ)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (frames bs r : List UInt8)
+  (ops : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) (i N : ℕ) (opened : Bool) (current : UInt8)
+  (l4 l6 l7 : UInt32) (l5 : UInt64) (hs : s.toNat + 32 ≤ 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hcurrent : WNear.IgnoreModel.Br current)
+  (hframes : ∀ f ∈ frames, WNear.IgnoreModel.Br f) (hi : i ≤ bs.length)
+  (hmodel :
+    WNear.Binary.SerdeIgnMachineTrace.run WNear.IgnoreModel.vSkip WNear.Binary.SerdeIgnMachineTrace.keyBody (N + 1)
+        (if opened = true then WNear.IgnoreModel.Mode.opened current else WNear.IgnoreModel.Mode.cont current) frames
+        (List.drop i bs) =
+      some (r, ops)) :
+  WNear.Binary.SerdeIgnMember.code n maxP inst mi A ∗
+      NearLogic.credits Cg
+          (cfg.regularOpCost +
+            (WNear.Binary.SerdeIgnBudget.regular cfg
+                  (if opened = true then WNear.Binary.SerdeIgnBudget.openedAllowance current else 0)
+                  (bs.length - r.length - i) (frames.length + 1) +
+                WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+              R)) ∗
+        WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames Fr ⊢
+    NearLogic.mwpi cfg lim d
+      (WNear.Binary.SerdeIgnValue.fr81 inst mi de s (if opened = true then 0 else 1) l4 l5 l6 l7 current.toUInt32) []
+      WNear.Binary.SerdeIgnLoop.loopCode
+      (WNear.Binary.SerdeIgnLoop.post cfg inst mi n Cg R s de ptr p cap maxP hl F live frames bs r ops Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.loopCode` (hash `73294747334f4915`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.loopCode : List Wasm.Instr :=
+  [Wasm.Instr.loop Wasm.BlockType.empty WNear.Binary.SerdeIgnClosing.iterationCode]
+```
+
+`WNear.Binary.SerdeIgnLoop.loopCode_at` (hash `000000001e9d952d`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.loopCode_at :
+  List.take 1 (WNear.Binary.SerdeIgnSegments.bodyAt WNear.Binary.f81.body [14, 0, 0, 0, 3]) =
+    WNear.Binary.SerdeIgnLoop.loopCode
+```
+
+`WNear.Binary.SerdeIgnLoop.memberExit` (hash `e9334d906ad44acb`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.memberExit {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n Cg R : ℕ) (s de ptr p cap : UInt32) (maxP hl F : ℕ)
+  (live : List (ℕ × ℕ)) (initial bs r : List UInt8) (original : List WNear.Binary.SerdeIgnTrace.Op) (allowance : ℕ)
+  (comma : Bool) (Fr : Iris.IProp GF) (vs : List Wasm.Value) (fr : WasmLogic.Frame) : Iris.IProp GF :=
+  fun fr =>
+    iprop(∃ i N current frames ops l3 l4 l6 l7 l5,
+        ⌜vs = [] ∧
+              fr = WNear.Binary.SerdeIgnValue.fr81 inst mi de s l3 l4 l5 l6 l7 current.toUInt32 ∧
+                WNear.IgnoreModel.Br current ∧
+                  (∀ f ∈ frames, WNear.IgnoreModel.Br f) ∧
+                    i ≤ bs.length ∧
+                      WNear.Binary.SerdeIgnLoop.Pops initial frames original ops ∧
+                        WNear.Binary.SerdeIgnMember.nextModel N current frames (List.drop i bs) =
+                            some (r, ops) ∧
+                          l3 = if comma = true then 1 else 0⌝ ∗
+          NearLogic.credits Cg
+              (allowance * cfg.regularOpCost +
+                      WNear.Binary.SerdeIgnBudget.memberAllowance current * cfg.regularOpCost +
+                    WNear.Binary.SerdeIgnBudget.regular cfg 0 (bs.length - r.length - i)
+                      (frames.length + 1) +
+                  WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+                R) ∗
+            WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.phase` (hash `000000000260763d`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.phase {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth) (Cg R : ℕ)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (frames bs r : List UInt8)
+  (ops : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) (i N : ℕ) (opened : Bool) (current : UInt8)
+  (l4 l6 l7 : UInt32) (l5 : UInt64) (hs : s.toNat + 32 ≤ 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hcurrent : WNear.IgnoreModel.Br current)
+  (hframes : ∀ f ∈ frames, WNear.IgnoreModel.Br f) (hi : i ≤ bs.length)
+  (hmodel :
+    WNear.Binary.SerdeIgnMachineTrace.run WNear.IgnoreModel.vSkip WNear.Binary.SerdeIgnMachineTrace.keyBody (N + 1)
+        (if opened = true then WNear.IgnoreModel.Mode.opened current else WNear.IgnoreModel.Mode.cont current) frames
+        (List.drop i bs) =
+      some (r, ops)) :
+  WNear.Binary.SerdeIgnMember.code n maxP inst mi A ∗
+      NearLogic.credits Cg
+          (2 * cfg.regularOpCost +
+            (WNear.Binary.SerdeIgnBudget.regular cfg
+                  (if opened = true then WNear.Binary.SerdeIgnBudget.openedAllowance current else 0)
+                  (bs.length - r.length - i) (frames.length + 1) +
+                WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+              R)) ∗
+        WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames Fr ⊢
+    NearLogic.mwpi cfg lim d
+      (WNear.Binary.SerdeIgnValue.fr81 inst mi de s (if opened = true then 0 else 1) l4 l5 l6 l7 current.toUInt32) []
+      WNear.Binary.SerdeIgnLoop.phaseCode
+      (WNear.Binary.SerdeIgnLoop.phasePost cfg inst mi n Cg R s de ptr p cap maxP hl F live frames bs r ops Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.phaseCode` (hash `6bfee1005f4a9e50`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.phaseCode : List Wasm.Instr :=
+  [Wasm.Instr.block Wasm.BlockType.empty
+      (WNear.Binary.SerdeIgnLoop.loopCode ++ WNear.Binary.SerdeIgnContainer.exitCode ++
+        WNear.Binary.SerdeIgnLoop.errorTail)]
+```
+
+`WNear.Binary.SerdeIgnLoop.phaseCode_at` (hash `000000005295a15b`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.phaseCode_at :
+  List.take 1 (List.drop 3 (WNear.Binary.SerdeIgnSegments.bodyAt WNear.Binary.f81.body [14, 0, 0, 0])) =
+    WNear.Binary.SerdeIgnLoop.phaseCode
+```
+
+`WNear.Binary.SerdeIgnLoop.phasePost` (hash `4c488e7a7d2aea65`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.phasePost {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n Cg R : ℕ) (s de ptr p cap : UInt32) (maxP hl F : ℕ)
+  (live : List (ℕ × ℕ)) (initial bs r : List UInt8) (original : List WNear.Binary.SerdeIgnTrace.Op)
+  (Fr : Iris.IProp GF) : WasmLogic.Post Wasm.NearState GF :=
+  fun Fr =>
+    {
+      normal := fun vs fr =>
+        iprop(∃ comma,
+            WNear.Binary.SerdeIgnLoop.memberExit cfg inst mi n Cg R s de ptr p cap maxP hl F live
+              initial bs r original 3 comma Fr vs fr),
+      br := fun k vs fr =>
+        iprop(⌜k = 2⌝ ∗
+            WNear.Binary.SerdeIgnLoop.successExit cfg inst mi n Cg R s de ptr p cap maxP hl F live
+              initial bs r original Fr vs fr) }
+```
+
+`WNear.Binary.SerdeIgnLoop.post` (hash `2ae388f611cc0ebb`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.post {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n Cg R : ℕ) (s de ptr p cap : UInt32) (maxP hl F : ℕ)
+  (live : List (ℕ × ℕ)) (initial bs r : List UInt8) (original : List WNear.Binary.SerdeIgnTrace.Op)
+  (Fr : Iris.IProp GF) : WasmLogic.Post Wasm.NearState GF :=
+  fun Fr =>
+    {
+      normal :=
+        WNear.Binary.SerdeIgnLoop.memberExit cfg inst mi n Cg R s de ptr p cap maxP hl F live
+          initial bs r original 9 false Fr,
+      br := fun k vs fr =>
+        iprop(⌜k = 0⌝ ∗
+              WNear.Binary.SerdeIgnLoop.memberExit cfg inst mi n Cg R s de ptr p cap maxP hl F
+                live initial bs r original 9 true Fr vs fr ∨
+            ⌜k = 3⌝ ∗
+              WNear.Binary.SerdeIgnLoop.successExit cfg inst mi n Cg R s de ptr p cap maxP hl F
+                live initial bs r original Fr vs fr) }
+```
+
+`WNear.Binary.SerdeIgnLoop.resources` (hash `6bd7c04d0f82235a`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.resources {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (n : ℕ)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (bs : List UInt8) (i : ℕ) (frames : List UInt8)
+  (Fr : Iris.IProp GF) : Iris.IProp GF :=
+  fun Fr =>
+    iprop(WNear.Binary.VecFromElem.stk n s.toNat 32 ∗
+        WNear.Binary.SerdeIgnStack.state n maxP hl live F (de + 12) p cap frames ∗
+          WNear.Binary.SerdeRead.rd n de ptr bs i ∗ Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.successExit` (hash `36f54b445dbeb498`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.successExit {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n Cg R : ℕ) (s de ptr p cap : UInt32) (maxP hl F : ℕ)
+  (live : List (ℕ × ℕ)) (initial bs r : List UInt8) (original : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF)
+  (vs : List Wasm.Value) (fr : WasmLogic.Frame) : Iris.IProp GF :=
+  fun fr =>
+    iprop(∃ i l3 l4 l6 l7 l8 l5,
+        ⌜vs = [] ∧
+              fr = WNear.Binary.SerdeIgnValue.fr81 inst mi de s l3 l4 l5 l6 l7 l8 ∧
+                i = bs.length - r.length ∧
+                  i ≤ bs.length ∧ WNear.Binary.SerdeIgnLoop.Pops initial [] original []⌝ ∗
+          NearLogic.credits Cg (19 * cfg.regularOpCost + R) ∗
+            WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i [] Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.suffix` (hash `000000003410ffd7`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.suffix {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 15 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (frames bs r : List UInt8)
+  (ops : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) (i N : ℕ) (opened : Bool) (current : UInt8)
+  (l4 l6 l7 : UInt32) (l5 : UInt64) (hs : s.toNat + 32 ≤ 2 ^ 32) (hstack : 128 ≤ s.toNat) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hlen : bs.length + 16 < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hcurrent : WNear.IgnoreModel.Br current)
+  (hframes : ∀ f ∈ frames, WNear.IgnoreModel.Br f) (hi : i ≤ bs.length)
+  (hmodel :
+    WNear.Binary.SerdeIgnMachineTrace.run WNear.IgnoreModel.vSkip WNear.Binary.SerdeIgnMachineTrace.keyBody (N + 1)
+        (if opened = true then WNear.IgnoreModel.Mode.opened current else WNear.IgnoreModel.Mode.cont current) frames
+        (List.drop i bs) =
+      some (r, ops)) :
+  WNear.Binary.SerdeIgnMember.code n maxP inst mi A ∗
+      NearLogic.credits Cg
+          (2 * cfg.regularOpCost +
+            (WNear.Binary.SerdeIgnBudget.regular cfg
+                  (if opened = true then WNear.Binary.SerdeIgnBudget.openedAllowance current else 0)
+                  (bs.length - r.length - i) (frames.length + 1) +
+                WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+              R)) ∗
+        WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames
+          (WNear.Binary.SerdeIgnLoop.caller n g gt s Fr) ⊢
+    NearLogic.mwpi cfg lim d
+      (WNear.Binary.SerdeIgnValue.fr81 inst mi de s (if opened = true then 0 else 1) l4 l5 l6 l7 current.toUInt32) []
+      WNear.Binary.SerdeIgnLoop.suffixCode
+      (WNear.Binary.SerdeIgnLoop.suffixPost cfg inst mi n g Cg R gt s de ptr p cap maxP hl F live frames bs r ops Fr)
+```
+
+`WNear.Binary.SerdeIgnLoop.suffixCode` (hash `0c403b1eb4c8ed34`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.suffixCode : List Wasm.Instr :=
+  WNear.Binary.SerdeIgnLoop.phaseCode ++ WNear.Binary.SerdeIgnMember.memberCode
+```
+
+`WNear.Binary.SerdeIgnLoop.suffixCode_at` (hash `000000005bb3948c`)
+
+```lean
+theorem WNear.Binary.SerdeIgnLoop.suffixCode_at :
+  List.drop 3 (WNear.Binary.SerdeIgnSegments.bodyAt WNear.Binary.f81.body [14, 0, 0, 0]) =
+    WNear.Binary.SerdeIgnLoop.suffixCode
+```
+
+`WNear.Binary.SerdeIgnLoop.suffixPost` (hash `82127fcb1dcadd9b`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.suffixPost {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n g Cg R : ℕ) (gt : Wasm.GlobalType)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (initial bs r : List UInt8)
+  (original : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) : WasmLogic.Post Wasm.NearState GF :=
+  fun Fr =>
+    { normal := fun x x_1 => iprop(False),
+      br := fun k vs fr =>
+        iprop(⌜k = 0⌝ ∗
+              WNear.Binary.SerdeIgnLoop.valueExit cfg inst mi n g Cg R gt s de ptr p cap maxP hl F
+                live initial bs r original Fr vs fr ∨
+            ⌜k = 2⌝ ∗
+              WNear.Binary.SerdeIgnLoop.successExit cfg inst mi n Cg R s de ptr p cap maxP hl F
+                live initial bs r original (WNear.Binary.SerdeIgnLoop.caller n g gt s Fr) vs fr) }
+```
+
+`WNear.Binary.SerdeIgnLoop.valueExit` (hash `2b628e35e15e73f2`)
+
+```lean
+def WNear.Binary.SerdeIgnLoop.valueExit {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (inst : ℕ) (mi : Wasm.ModuleInst) (n g Cg R : ℕ) (gt : Wasm.GlobalType)
+  (s de ptr p cap : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (initial bs r : List UInt8)
+  (original : List WNear.Binary.SerdeIgnTrace.Op) (Fr : Iris.IProp GF) (vs : List Wasm.Value) (fr : WasmLogic.Frame) :
+  Iris.IProp GF :=
+  fun fr =>
+    iprop(∃ i N current frames ops l6 l7 l5,
+        ⌜vs = [] ∧
+              fr = WNear.Binary.SerdeIgnValue.fr81 inst mi de s 1 0 l5 l6 l7 current.toUInt32 ∧
+                WNear.IgnoreModel.Br current ∧
+                  (∀ f ∈ frames, WNear.IgnoreModel.Br f) ∧
+                    i ≤ bs.length ∧
+                      WNear.Binary.SerdeIgnLoop.Pops initial frames original ops ∧
+                        WNear.Binary.SerdeIgnMachineTrace.run WNear.IgnoreModel.vSkip
+                            WNear.Binary.SerdeIgnMachineTrace.keyBody N WNear.IgnoreModel.Mode.val
+                            (current :: frames) (List.drop i bs) =
+                          some (r, ops)⌝ ∗
+          NearLogic.credits Cg
+              (4 * cfg.regularOpCost +
+                    WNear.Binary.SerdeIgnBudget.regular cfg 64 (bs.length - r.length - i)
+                      (frames.length + 1) +
+                  WNear.Binary.SerdeIgnTrace.extraCost cfg F cap frames.length ops +
+                R) ∗
+            WNear.Binary.SerdeIgnLoop.resources n s de ptr p cap maxP hl F live bs i frames
+              (WNear.Binary.SerdeIgnLoop.caller n g gt s Fr))
+```
+
 ## Bridge.Functions.SerdeIgnMachineTrace
 
 `WNear.Binary.SerdeIgnMachineTrace.trace_budget` (hash `00000000b8e9a8c2`)

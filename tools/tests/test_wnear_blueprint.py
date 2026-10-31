@@ -142,6 +142,35 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_container_loop_composes_actual_phases_without_closing_ignore_hyp(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['ignored-container-iteration', 'ignored-container-loop',
+                     'ignored-container-phase', 'ignored-container-suffix', 'ignored-decoded-suffix']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for source, caller in [('ignored-closing', 'ignored-container-iteration'),
+                               ('ignored-container-iteration', 'ignored-container-loop'),
+                               ('ignored-container-loop', 'ignored-container-phase'),
+                               ('ignored-container-phase', 'ignored-container-suffix'),
+                               ('ignored-member', 'ignored-container-suffix'),
+                               ('ignored-container-suffix', 'ignored-decoded-suffix'),
+                               ('ignored-suffix-code', 'ignored-decoded-suffix')]:
+            self.assertIn({'id': caller, 'status': 'Proven'}, result[source]['integrated_into'])
+        for node in ['ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-cost']:
+            self.assertEqual(result[node]['status'], 'Open')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_container_iteration_cannot_drop_nested_close_composition(self):
+        self.by_id['ignored-container-iteration']['proof_dependencies'].remove(
+            self.nodes['ignored-closing']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_decoded_suffix_cannot_drop_its_checked_bytecode_equality(self):
+        self.by_id['ignored-decoded-suffix']['proof_dependencies'].remove(
+            self.nodes['ignored-suffix-code']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
