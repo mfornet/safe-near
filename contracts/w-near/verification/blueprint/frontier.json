@@ -9225,6 +9225,460 @@
         "accepted-array-case"
       ],
       "reviewed_shape_hash": 2604605510
+    },
+    {
+      "id": "present-storage-balance",
+      "declaration": "WNear.Binary.BalanceOfPresent.f415_some",
+      "title": "Present balance lookup returns its exact stored words",
+      "kind": "theorem",
+      "label": "frontier:present-storage-balance",
+      "notes": "Actual f415 uses the checked some-value lookup, reconstructs its two stored 64-bit words and frees the owned account string. Exact storage-read observation, one credit cell and three possible lookup grows are retained.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3716921891
+    },
+    {
+      "id": "present-token-balance",
+      "declaration": "WNear.Binary.BalanceOfPresent.f293_some",
+      "title": "Token balance composes the present storage lookup",
+      "kind": "theorem",
+      "label": "frontier:present-token-balance",
+      "notes": "Actual f293 reaches f415 and returns the exact 16 stored bytes under explicit register, trie, heap and key premises.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-storage-balance"
+      ],
+      "reviewed_shape_hash": 3351481530
+    },
+    {
+      "id": "present-call-copy",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.call_and_copy_present",
+      "title": "Actual balance caller copies the returned stored words",
+      "kind": "theorem",
+      "label": "frontier:present-call-copy",
+      "notes": "Actual f297 call and copy segments compose token lookup and preserve exact owned words for arbitrary stored u128.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-token-balance"
+      ],
+      "reviewed_shape_hash": 4005830839
+    },
+    {
+      "id": "present-format",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.format_value",
+      "title": "Arbitrary stored u128 is formatted into its exact JSON string",
+      "kind": "theorem",
+      "label": "frontier:present-format",
+      "notes": "Actual serializer returns quote plus the exact decimal digits plus quote, preserving its precise buffer, heap and gas costs.",
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1181799816
+    },
+    {
+      "id": "present-call-format",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.call_copy_and_format_present",
+      "title": "Present lookup and copy compose with arbitrary-value serialization",
+      "kind": "theorem",
+      "label": "frontier:present-call-format",
+      "notes": "Exact actual stored words flow into decimal formatting, including the additional heap growth and free-list cell for a present value.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-call-copy",
+        "present-format"
+      ],
+      "reviewed_shape_hash": 63001017
+    },
+    {
+      "id": "present-expect",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.call_copy_format_and_expect_present",
+      "title": "Actual success unwrap follows present serialization",
+      "kind": "theorem",
+      "label": "frontier:present-expect",
+      "notes": "The checked shared unwrap code composes the arbitrary present result with its exact frame and owned buffer.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-call-format"
+      ],
+      "reviewed_shape_hash": 3759906337
+    },
+    {
+      "id": "present-result-length",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.resultBytes_length",
+      "title": "Returned u128 JSON byte length matches the machine descriptor",
+      "kind": "theorem",
+      "label": "frontier:present-result-length",
+      "notes": "The actual machine result length equals quote plus decimal digits plus quote for every two-word u128.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2045654425
+    },
+    {
+      "id": "present-return",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.call_through_value_return_present",
+      "title": "Present result reaches the actual host return",
+      "kind": "theorem",
+      "label": "frontier:present-return",
+      "notes": "Actual value_return receives the exact stored-balance JSON bytes and length; host return limit and gas charge use that length.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-expect",
+        "present-result-length"
+      ],
+      "reviewed_shape_hash": 3121631545
+    },
+    {
+      "id": "present-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.call_through_cleanup_present",
+      "title": "Present result reaches checked final cleanup",
+      "kind": "theorem",
+      "label": "frontier:present-cleanup",
+      "notes": "Actual retained prefix and answer buffer are freed; the stack global is restored and actual selected return data is preserved. Heap/free-list allowance accounts for the extra stored-value allocation.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-return"
+      ],
+      "reviewed_shape_hash": 2997565582
+    },
+    {
+      "id": "present-parsed-account",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.parsed_account_through_cleanup_present",
+      "title": "Owned parsed account connects to present cleanup",
+      "kind": "theorem",
+      "label": "frontier:present-parsed-account",
+      "notes": "The checked actual argument-copy segment connects the retained parsed account descriptor to lookup, return and cleanup.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-cleanup"
+      ],
+      "reviewed_shape_hash": 3444211107
+    },
+    {
+      "id": "present-second-read",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentBalanceReadAfterStateF",
+      "title": "Present second-read storage and gas contract",
+      "kind": "verification_contract",
+      "label": "frontier:present-second-read",
+      "notes": "Exact next-read trie accounting, storageSome words and actual lookup-cost ceiling after loading state. Generic interface remains Open; concrete two-read budget constructor is separate.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 16890460376106184626
+    },
+    {
+      "id": "present-state-read",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.state_through_cleanup_presentF",
+      "title": "State loading composes with the present account suffix",
+      "kind": "theorem",
+      "label": "frontier:present-state-read",
+      "notes": "Actual state loading and retained storage prefix compose the parsed-account present suffix, assuming the precisely named second-read contract.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "owned-room",
+        "present-second-read",
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "present-parsed-account"
+      ],
+      "reviewed_shape_hash": 879779811
+    },
+    {
+      "id": "present-two-read-budget",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.presentBalanceReadAfterState_exact_from_budget",
+      "title": "Shared trie budget constructs the exact present second read",
+      "kind": "theorem",
+      "label": "frontier:present-two-read-budget",
+      "notes": "StorageReadPost.next propagates the shared two-read proof budget, canonical trie and storage link; preserved fees and ext costs prove the exact present lookup gas ceiling.",
+      "required_type_dependencies": [
+        "present-second-read"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3873055553
+    },
+    {
+      "id": "present-seven-room",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_room_after_state",
+      "title": "Seven grows cover state loading and present lookup",
+      "kind": "theorem",
+      "label": "frontier:present-seven-room",
+      "notes": "State loading consumes at most two one-page grows and leaves the five required for actual present lookup and formatting.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "owned-room"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1552312670
+    },
+    {
+      "id": "present-state-seven",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.state_through_cleanup_present_seven_growsF",
+      "title": "Present state path constructs room and second-read premises",
+      "kind": "theorem",
+      "label": "frontier:present-state-seven",
+      "notes": "The same actual state-to-cleanup segment uses one seven-growth room bound and initial shared trie budget. No abstract second-read gas/room contract remains.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "present-state-read",
+        "present-two-read-budget",
+        "present-seven-room"
+      ],
+      "reviewed_shape_hash": 4083968894
+    },
+    {
+      "id": "present-parser-handoff",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.parser_through_cleanup_present",
+      "title": "Actual parser handoff reaches present return and cleanup",
+      "kind": "theorem",
+      "label": "frontier:present-parser-handoff",
+      "notes": "Generic checked parser success handoff drops the input, reconstructs owned account/state resources and calls the present state path.",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "present-state-seven"
+      ],
+      "reviewed_shape_hash": 139912309
+    },
+    {
+      "id": "present-parser-fixed",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.parser_fixed_through_cleanup_present",
+      "title": "Fixed owned parser result composes with the present path",
+      "kind": "theorem",
+      "label": "frontier:present-parser-fixed",
+      "notes": "The existing exact okAtFixed resource bridge supplies the actual account payload to present execution without changing its ownership invariant.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [
+        "present-parser-handoff"
+      ],
+      "reviewed_shape_hash": 555087840
+    },
+    {
+      "id": "present-parser-contract",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentParserCallContract",
+      "title": "Present path requires the exact successful parser call",
+      "kind": "verification_contract",
+      "label": "frontier:present-parser-contract",
+      "notes": "Exact actual f65 MFunSpec and retained statics/resources with seven-growth post room. Generic contract stays Open; actual object ledger constructor supplies a separate instance.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 14596748032722369572
+    },
+    {
+      "id": "present-parser-provider",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.parser_provider_through_cleanup_present",
+      "title": "Actual parser call composes through present cleanup",
+      "kind": "theorem",
+      "label": "frontier:present-parser-provider",
+      "notes": "Actual f65 call consumes the named present parser contract and reaches present storage lookup, arbitrary-value serialization, host return and cleanup. Whole-method entry/model/gas integration remains to be proved.",
+      "required_type_dependencies": [
+        "present-parser-contract"
+      ],
+      "required_proof_dependencies": [
+        "present-parser-fixed"
+      ],
+      "reviewed_shape_hash": 667842843
+    },
+    {
+      "id": "present-ledger-room",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_result_room_present",
+      "title": "Actual retained parser ledger supplies seven-growth room",
+      "kind": "theorem",
+      "label": "frontier:present-ledger-room",
+      "notes": "The original successful object ledger ceiling constructs seven-growth room while retaining exactly the same owned okAtFixed result and F+43 cell bound.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "object-ledger-setup",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 958191062
+    },
+    {
+      "id": "present-ledger-from-slice",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_room_present",
+      "title": "Actual object slice parser returns room for present execution",
+      "kind": "theorem",
+      "label": "frontier:present-ledger-from-slice",
+      "notes": "The completed ledger object parser returns seven-growth room and the original owned account result. Named reader/setup charge contracts remain visible.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "object-ignore-charges",
+        "object-key-room-charges",
+        "object-ledger-setup",
+        "object-value-room-charges",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [
+        "ledger-from-slice",
+        "present-ledger-room"
+      ],
+      "reviewed_shape_hash": 679509267
+    },
+    {
+      "id": "present-ledger-parser",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_contract_present",
+      "title": "Actual object parser constructs the present call contract",
+      "kind": "theorem",
+      "label": "frontier:present-ledger-parser",
+      "notes": "Actual object ledger parser packages exact f65 code, gas, statics and retained seven-growth resources for PresentParserCallContract. Original reader charge/setup hypotheses remain unresolved until actual instances are supplied.",
+      "required_type_dependencies": [
+        "object-ignore-charges",
+        "object-key-room-charges",
+        "object-ledger-setup",
+        "object-value-room-charges",
+        "present-parser-contract"
+      ],
+      "required_proof_dependencies": [
+        "present-ledger-from-slice"
+      ],
+      "reviewed_shape_hash": 1352353628
+    },
+    {
+      "id": "present-parser-family",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentParserFamily",
+      "title": "Present parser provider at every reachable call site",
+      "kind": "verification_contract",
+      "label": "frontier:present-parser-family",
+      "notes": "Exact successful f65 provider family at every actual input-allocation outcome, stack and pointer instance. Generic interface is Open; the actual object ledger supplies a separate checked constructor.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 8077505916286776745
+    },
+    {
+      "id": "present-provider-deref",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_deref_parser_through_cleanup_present",
+      "title": "Actual dereference and parser setup reach present cleanup",
+      "kind": "theorem",
+      "label": "frontier:present-provider-deref",
+      "notes": "The actual input-vector dereference and call setup compose the present parser call through return and cleanup under the uniform named family.",
+      "required_type_dependencies": [
+        "present-parser-family"
+      ],
+      "required_proof_dependencies": [
+        "present-parser-provider"
+      ],
+      "reviewed_shape_hash": 3662793806
+    },
+    {
+      "id": "present-provider-expect",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_expect_deref_parser_through_cleanup_present",
+      "title": "Actual input success unwrap composes with present execution",
+      "kind": "theorem",
+      "label": "frontier:present-provider-expect",
+      "notes": "The checked generic input unwrap and exact owned vector feed the present dereference/parser-to-cleanup segment.",
+      "required_type_dependencies": [
+        "present-parser-family"
+      ],
+      "required_proof_dependencies": [
+        "present-provider-deref"
+      ],
+      "reviewed_shape_hash": 3265515736
+    },
+    {
+      "id": "present-provider-input",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_input_parser_through_cleanup_present",
+      "title": "Actual host input read composes with present execution",
+      "kind": "theorem",
+      "label": "frontier:present-provider-input",
+      "notes": "Actual f527 input read and allocation supply the uniform parser family and reach the stored balance result. Exact input-register room remains explicit.",
+      "required_type_dependencies": [
+        "present-parser-family",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "present-provider-expect"
+      ],
+      "reviewed_shape_hash": 2740595733
+    },
+    {
+      "id": "present-provider-setup",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_input_setup_through_cleanup_present",
+      "title": "Actual input setup reaches registered-account cleanup",
+      "kind": "theorem",
+      "label": "frontier:present-provider-setup",
+      "notes": "Actual f297 setup connects host input read to the present parser/storage/return path, retaining exact resources and cost.",
+      "required_type_dependencies": [
+        "present-parser-family",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "present-provider-input"
+      ],
+      "reviewed_shape_hash": 278088317
+    },
+    {
+      "id": "present-provider-body",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_present_body",
+      "title": "Whole registered-account binary body composes from a provider",
+      "kind": "theorem",
+      "label": "frontier:present-provider-body",
+      "notes": "Actual function 297 prologue, input read, parser, state/account storage, arbitrary u128 return and cleanup compose under the exact family and register-room premises. Receipt/model correspondence and total original method gas bound remain open.",
+      "required_type_dependencies": [
+        "present-parser-family",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "present-provider-setup"
+      ],
+      "reviewed_shape_hash": 2913423547
+    },
+    {
+      "id": "present-ledger-family",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_family_present",
+      "title": "Actual object ledger constructs the present parser family",
+      "kind": "theorem",
+      "label": "frontier:present-ledger-family",
+      "notes": "Every actual input allocation heap outcome instantiates the unchanged LedgerSetup from its original 4 MiB bound. Actual key/value/ignored reader charge hypotheses remain named dependencies.",
+      "required_type_dependencies": [
+        "present-parser-family",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "present-ledger-parser",
+        "ledger-input-bounds"
+      ],
+      "reviewed_shape_hash": 219184544
+    },
+    {
+      "id": "present-provider-initial",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_present_body_initial_resources",
+      "title": "Present body closes actual initial input allocation room",
+      "kind": "theorem",
+      "label": "frontier:present-provider-initial",
+      "notes": "The actual initial frame, instantiated function cells, statics and initial memory supply the entire registered-account body. Initial input-register room is constructed from the unchanged input bound; exact successful parser family and method gas remain explicit.",
+      "required_type_dependencies": [
+        "present-parser-family"
+      ],
+      "required_proof_dependencies": [
+        "present-provider-body",
+        "initial-memory-parser-room"
+      ],
+      "reviewed_shape_hash": 3165475249
     }
   ],
   "reviewed_environment": [

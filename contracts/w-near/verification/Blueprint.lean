@@ -1,3 +1,5 @@
+import Bridge.Functions.BalanceOf297PresentFamily
+import Bridge.Functions.SerdeObjectPresentProvider
 import Bridge.Methods.FtBalanceOfFullWeightedObject
 import Bridge.Methods.FtBalanceOfWeightedLinearGas
 import Bridge.Methods.FtBalanceOfSmallGeneralObject
@@ -3783,3 +3785,182 @@ attribute [blueprint "frontier:accepted-absent-cases"
   (title := /-- Every accepted absent-account input belongs to a completed case -/)
   (statement := /-- Within the explicit original argument bound, every accepted ft_balance_of input is either the completed array case or the full successful general-object case. No abstract parser/model premise is required. -/)]
   WNear.Binary.BalanceOf297AbsentCall.accepted_absent_cases
+
+attribute [blueprint "frontier:present-storage-balance"
+  (title := /-- Present balance lookup returns its exact stored words -/)
+  (statement := /-- Actual f415 uses the checked some-value lookup, reconstructs its two stored 64-bit words and frees the owned account string. Exact storage-read observation, one credit cell and three possible lookup grows are retained. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOfPresent.f415_some
+
+attribute [blueprint "frontier:present-token-balance"
+  (title := /-- Token balance composes the present storage lookup -/)
+  (statement := /-- Actual f293 reaches f415 and returns the exact 16 stored bytes under explicit register, trie, heap and key premises. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOfPresent.f293_some
+
+attribute [blueprint "frontier:present-call-copy"
+  (title := /-- Actual balance caller copies the returned stored words -/)
+  (statement := /-- Actual f297 call and copy segments compose token lookup and preserve exact owned words for arbitrary stored u128. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.call_and_copy_present
+
+attribute [blueprint "frontier:present-format"
+  (title := /-- Arbitrary stored u128 is formatted into its exact JSON string -/)
+  (statement := /-- Actual serializer returns quote plus the exact decimal digits plus quote, preserving its precise buffer, heap and gas costs. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.format_value
+
+attribute [blueprint "frontier:present-call-format"
+  (title := /-- Present lookup and copy compose with arbitrary-value serialization -/)
+  (statement := /-- Exact actual stored words flow into decimal formatting, including the additional heap growth and free-list cell for a present value. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.call_copy_and_format_present
+
+attribute [blueprint "frontier:present-expect"
+  (title := /-- Actual success unwrap follows present serialization -/)
+  (statement := /-- The checked shared unwrap code composes the arbitrary present result with its exact frame and owned buffer. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.call_copy_format_and_expect_present
+
+attribute [blueprint "frontier:present-result-length"
+  (title := /-- Returned u128 JSON byte length matches the machine descriptor -/)
+  (statement := /-- The actual machine result length equals quote plus decimal digits plus quote for every two-word u128. -/)]
+  WNear.Binary.BalanceOf297PresentCall.resultBytes_length
+
+attribute [blueprint "frontier:present-return"
+  (title := /-- Present result reaches the actual host return -/)
+  (statement := /-- Actual value_return receives the exact stored-balance JSON bytes and length; host return limit and gas charge use that length. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.call_through_value_return_present
+
+attribute [blueprint "frontier:present-cleanup"
+  (title := /-- Present result reaches checked final cleanup -/)
+  (statement := /-- Actual retained prefix and answer buffer are freed; the stack global is restored and actual selected return data is preserved. Heap/free-list allowance accounts for the extra stored-value allocation. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.call_through_cleanup_present
+
+attribute [blueprint "frontier:present-parsed-account"
+  (title := /-- Owned parsed account connects to present cleanup -/)
+  (statement := /-- The checked actual argument-copy segment connects the retained parsed account descriptor to lookup, return and cleanup. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.parsed_account_through_cleanup_present
+
+attribute [blueprint "frontier:present-second-read"
+  (title := /-- Present second-read storage and gas contract -/)
+  (statement := /-- Exact next-read trie accounting, storageSome words and actual lookup-cost ceiling after loading state. Generic interface remains Open; concrete two-read budget constructor is separate. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentBalanceReadAfterStateF
+
+attribute [blueprint "frontier:present-state-read"
+  (title := /-- State loading composes with the present account suffix -/)
+  (statement := /-- Actual state loading and retained storage prefix compose the parsed-account present suffix, assuming the precisely named second-read contract. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.state_through_cleanup_presentF
+
+attribute [blueprint "frontier:present-two-read-budget"
+  (title := /-- Shared trie budget constructs the exact present second read -/)
+  (statement := /-- StorageReadPost.next propagates the shared two-read proof budget, canonical trie and storage link; preserved fees and ext costs prove the exact present lookup gas ceiling. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.presentBalanceReadAfterState_exact_from_budget
+
+attribute [blueprint "frontier:present-seven-room"
+  (title := /-- Seven grows cover state loading and present lookup -/)
+  (statement := /-- State loading consumes at most two one-page grows and leaves the five required for actual present lookup and formatting. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.present_room_after_state
+
+attribute [blueprint "frontier:present-state-seven"
+  (title := /-- Present state path constructs room and second-read premises -/)
+  (statement := /-- The same actual state-to-cleanup segment uses one seven-growth room bound and initial shared trie budget. No abstract second-read gas/room contract remains. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.state_through_cleanup_present_seven_growsF
+
+attribute [blueprint "frontier:present-parser-handoff"
+  (title := /-- Actual parser handoff reaches present return and cleanup -/)
+  (statement := /-- Generic checked parser success handoff drops the input, reconstructs owned account/state resources and calls the present state path. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.parser_through_cleanup_present
+
+attribute [blueprint "frontier:present-parser-fixed"
+  (title := /-- Fixed owned parser result composes with the present path -/)
+  (statement := /-- The existing exact okAtFixed resource bridge supplies the actual account payload to present execution without changing its ownership invariant. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.parser_fixed_through_cleanup_present
+
+attribute [blueprint "frontier:present-parser-contract"
+  (title := /-- Present path requires the exact successful parser call -/)
+  (statement := /-- Exact actual f65 MFunSpec and retained statics/resources with seven-growth post room. Generic contract stays Open; actual object ledger constructor supplies a separate instance. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentParserCallContract
+
+attribute [blueprint "frontier:present-parser-provider"
+  (title := /-- Actual parser call composes through present cleanup -/)
+  (statement := /-- Actual f65 call consumes the named present parser contract and reaches present storage lookup, arbitrary-value serialization, host return and cleanup. Whole-method entry/model/gas integration remains to be proved. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.parser_provider_through_cleanup_present
+
+attribute [blueprint "frontier:present-ledger-room"
+  (title := /-- Actual retained parser ledger supplies seven-growth room -/)
+  (statement := /-- The original successful object ledger ceiling constructs seven-growth room while retaining exactly the same owned okAtFixed result and F+43 cell bound. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_result_room_present
+
+attribute [blueprint "frontier:present-ledger-from-slice"
+  (title := /-- Actual object slice parser returns room for present execution -/)
+  (statement := /-- The completed ledger object parser returns seven-growth room and the original owned account result. Named reader/setup charge contracts remain visible. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f65_ledger_room_present
+
+attribute [blueprint "frontier:present-ledger-parser"
+  (title := /-- Actual object parser constructs the present call contract -/)
+  (statement := /-- Actual object ledger parser packages exact f65 code, gas, statics and retained seven-growth resources for PresentParserCallContract. Original reader charge/setup hypotheses remain unresolved until actual instances are supplied. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_parser_contract_present
+
+attribute [blueprint "frontier:present-parser-family"
+  (title := /-- Present parser provider at every reachable call site -/)
+  (statement := /-- Exact successful f65 provider family at every actual input-allocation outcome, stack and pointer instance. Generic interface is Open; the actual object ledger supplies a separate checked constructor. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentParserFamily
+
+attribute [blueprint "frontier:present-provider-deref"
+  (title := /-- Actual dereference and parser setup reach present cleanup -/)
+  (statement := /-- The actual input-vector dereference and call setup compose the present parser call through return and cleanup under the uniform named family. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_deref_parser_through_cleanup_present
+
+attribute [blueprint "frontier:present-provider-expect"
+  (title := /-- Actual input success unwrap composes with present execution -/)
+  (statement := /-- The checked generic input unwrap and exact owned vector feed the present dereference/parser-to-cleanup segment. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_expect_deref_parser_through_cleanup_present
+
+attribute [blueprint "frontier:present-provider-input"
+  (title := /-- Actual host input read composes with present execution -/)
+  (statement := /-- Actual f527 input read and allocation supply the uniform parser family and reach the stored balance result. Exact input-register room remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_input_parser_through_cleanup_present
+
+attribute [blueprint "frontier:present-provider-setup"
+  (title := /-- Actual input setup reaches registered-account cleanup -/)
+  (statement := /-- Actual f297 setup connects host input read to the present parser/storage/return path, retaining exact resources and cost. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_input_setup_through_cleanup_present
+
+attribute [blueprint "frontier:present-provider-body"
+  (title := /-- Whole registered-account binary body composes from a provider -/)
+  (statement := /-- Actual function 297 prologue, input read, parser, state/account storage, arbitrary u128 return and cleanup compose under the exact family and register-room premises. Receipt/model correspondence and total original method gas bound remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_present_body
+
+attribute [blueprint "frontier:present-ledger-family"
+  (title := /-- Actual object ledger constructs the present parser family -/)
+  (statement := /-- Every actual input allocation heap outcome instantiates the unchanged LedgerSetup from its original 4 MiB bound. Actual key/value/ignored reader charge hypotheses remain named dependencies. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_parser_family_present
+
+attribute [blueprint "frontier:present-provider-initial"
+  (title := /-- Present body closes actual initial input allocation room -/)
+  (statement := /-- The actual initial frame, instantiated function cells, statics and initial memory supply the entire registered-account body. Initial input-register room is constructed from the unchanged input bound; exact successful parser family and method gas remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_present_body_initial_resources

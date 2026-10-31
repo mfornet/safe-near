@@ -738,6 +738,61 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_present_checked_segments_keep_global_frontier_visible(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['present-result-length']['status'], 'Proven')
+        for node in ['present-storage-balance', 'present-token-balance', 'present-call-copy', 'present-format', 'present-call-format', 'present-expect', 'present-return', 'present-cleanup', 'present-parsed-account', 'present-seven-room', 'present-state-seven', 'present-parser-handoff', 'present-parser-fixed', 'present-provider-deref', 'present-provider-expect', 'present-provider-input', 'present-provider-setup', 'present-provider-body', 'present-provider-initial', 'present-ledger-family']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['present-state-read', 'present-two-read-budget', 'present-parser-provider',
+                     'present-ledger-room', 'present-ledger-from-slice', 'present-ledger-parser', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['present-second-read', 'present-parser-contract', 'present-parser-family', 'balance-other-state-accepted',
+                     'balance-rejected', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source, caller, status in [('present-storage-balance', 'present-token-balance', 'Conditional'),
+                                       ('present-two-read-budget', 'present-state-seven', 'Conditional'),
+                                       ('present-state-seven', 'present-parser-handoff', 'Conditional'),
+                                       ('present-parser-fixed', 'present-parser-provider', 'Conditional'),
+                                       ('present-ledger-room', 'present-ledger-from-slice', 'Conditional')]:
+            self.assertIn({'id': caller, 'status': status}, result[source]['integrated_into'])
+
+    def test_present_lookup_cannot_skip_actual_stored_balance(self):
+        self.by_id['present-token-balance']['proof_dependencies'].remove(self.nodes['present-storage-balance']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_present_state_cannot_skip_second_read_budget(self):
+        self.by_id['present-state-seven']['proof_dependencies'].remove(self.nodes['present-two-read-budget']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_present_provider_keeps_exact_parser_contract(self):
+        self.by_id['present-parser-provider']['type_dependencies'].remove(self.nodes['present-parser-contract']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness does not match|Expected verification hypotheses'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_present_ledger_cannot_skip_real_heap_room(self):
+        self.by_id['present-ledger-from-slice']['proof_dependencies'].remove(self.nodes['present-ledger-room']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_present_parser_constructor_keeps_reader_allowances(self):
+        self.by_id['present-ledger-parser']['type_dependencies'].remove(self.nodes['object-ignore-charges']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_present_full_body_cannot_skip_entry_and_input_composition(self):
+        self.by_id['present-provider-body']['proof_dependencies'].remove(self.nodes['present-provider-setup']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_present_initial_body_keeps_exact_uniform_parser_family(self):
+        self.by_id['present-provider-initial']['type_dependencies'].remove(self.nodes['present-parser-family']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness does not match|Expected verification hypotheses'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan', 'pinned-arguments-limit', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'ignore-hyp', 'key-conditions', 'value-conditions']:

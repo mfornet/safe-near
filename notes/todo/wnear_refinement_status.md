@@ -33,6 +33,48 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: registered-account whole binary body composition
+
+The actual present-account path now composes stored 16-byte balance lookup,
+account cleanup, arbitrary two-word u128 serialization, exact-length host return,
+stack restoration and retained-prefix/answer cleanup. Stored words are preserved
+through the actual f415/f293/f297 call and copy segments; serialization and host
+return use the exact decimal byte length. Heap and free-list allowances account
+for the extra value allocation. The one owned gas credit cell is preserved.
+
+The state-read bridge propagates the shared two-read trie proof budget, canonical
+storage and storage link. Preserved fee/ext-cost fields construct the actual
+second-read cost, including stored-value register copying. Seven possible grows
+cover state loading plus present lookup/formatting. Existing generic parser
+handoff and okAtFixed resources now compose through this actual suffix. The
+actual f65 call has checked parser-to-cleanup composition under an exact named
+PresentParserCallContract. The original successful object ledger ceiling also
+constructs seven-growth room and an actual instance of that parser contract.
+
+The generic PresentParserCallContract and PresentBalanceReadAfterStateF stay
+Open; their concrete constructors remain separately visible. Reader charge/setup
+contracts in the raw object parser constructor remain unresolved dependencies;
+its packaging is Conditional. The state-to-cleanup seven-growth result constructs
+its own second-read contract and does not retain that abstract premise. The actual prologue, input read/allocation and parser setup now compose with
+this segment into the full function-297 body under a named PresentParserFamily
+and exact input-register room. The actual object ledger constructs the family at
+every reachable input heap outcome. No registered-account whole-method receipt
+or global accepted/safety clause is claimed here. The remaining frontier is
+actual reader instantiation, initial receipt/model correspondence and the total
+original method gas bound.
+
+All earlier global and method statements and all reviewed pins remain unchanged.
+No new admission is introduced, and the exact direct/transitive admission frontier
+and strict module allowance remain unchanged. Protocol premises, other states,
+rejected inputs and other methods still prevent end-to-end completion.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T16:33:42+00:00 for proof source `afbddcaf90af21de3f9b14218fec26dbab4612fc8c8d7bcd02fddf167fad15f7`. All 127 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical. The exact direct admission
+frontier, transitive incompleteness and the module allowance stay unchanged. Live publication must match
+this source and evidence.
+
 ## Continuation on 2026-10-31: full 4 MiB funding and accepted models compose globally
 
 Actual mixed growth is bounded by 36*peak*op+200 billion gas across the full
