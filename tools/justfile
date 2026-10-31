@@ -245,6 +245,11 @@ tools-test:
     python3 tools/run_unittests.py -s tools/tests
     python3 tools/run_unittests.py -s tools/runtime-conformance -p 'test_*.py'
 
+# The campaign driver (tools/campaign): `just campaign run --profile cheap`, status, results, auth, new, merge.
+[positional-arguments]
+campaign *args:
+    python3 tools/campaign_driver.py "$@"
+
 # The inexpensive automatic CI gate: no Lean downloads or native builds.
 ci-check: check-toolchains node-isolation umbrella-imports tools-test
 

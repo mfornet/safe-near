@@ -28,3 +28,7 @@ audit/
 
 # Redistribution permission for this upstream binary has not been established.
 /contracts/linkdrop/contract.wasm
+
+# Campaign driver worktrees and state (tools/campaign).
+/.campaign/
+/campaign/.state/
