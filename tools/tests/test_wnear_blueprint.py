@@ -491,6 +491,48 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_selected_key_receipt_instantiates_only_key_gas(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['prefix-reader-key-conditions', 'prefix-reader-value-conditions',
+                     'prefix-reader-ignore-conditions', 'prefix-reader-close-conditions',
+                     'prefix-key-gas', 'prefix-value-gas', 'prefix-ignore-gas',
+                     'key-conditions', 'value-conditions', 'ignore-hyp', 'provider-model-budget']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['prefix-canonical', 'prefix-cursor-unique', 'prefix-key-history',
+                     'prefix-key-selected-cost', 'prefix-bound-forget', 'prefix-member-forget']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['prefix-reader-key', 'prefix-reader-value', 'prefix-reader-ignore',
+                     'prefix-actual-loop', 'prefix-wrapper', 'prefix-from-trait',
+                     'prefix-from-slice', 'prefix-deployed-provider', 'prefix-provider-plan',
+                     'prefix-receipt', 'prefix-selected-key-instance', 'prefix-selected-key-receipt']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        last = result['prefix-selected-key-receipt']
+        self.assertTrue({'prefix-value-gas', 'prefix-ignore-gas', 'provider-model-budget'} <= set(last['type_edges']))
+        self.assertFalse({'prefix-key-gas', 'prefix-reader-key-conditions', 'precise-key-gas',
+                          'object-key-gas-obligation', 'object-key-room-charges'} & set(last['type_edges']))
+        self.assertIn({'id': 'prefix-selected-key-receipt', 'status': 'Conditional'}, result['prefix-selected-key-instance']['integrated_into'])
+
+    def test_selected_key_receipt_cannot_skip_key_instance(self):
+        self.by_id['prefix-selected-key-receipt']['proof_dependencies'].remove(self.nodes['prefix-selected-key-instance']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_selected_key_cost_cannot_skip_unique_history(self):
+        self.by_id['prefix-key-selected-cost']['proof_dependencies'].remove(self.nodes['prefix-key-history']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_canonical_prefix_cannot_skip_actual_value_model(self):
+        self.by_id['prefix-canonical']['proof_dependencies'].remove(self.nodes['prefix-step-value']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_prefix_wrapper_cannot_skip_actual_loop(self):
+        self.by_id['prefix-wrapper']['proof_dependencies'].remove(self.nodes['prefix-actual-loop']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

@@ -13894,6 +13894,1162 @@ theorem WNear.Binary.SerdeValueReuse.f68_scratch_exact {GF : Iris.BundledGFuncto
               n ↦[wms][ v.toNat + 8 ] WasmLogic.bytes32 sl ∗ WNear.Binary.AllocInv.heapInv n maxP hl live (F + 1))
 ```
 
+## Bridge.Functions.SerdePrefixBounds
+
+`WNear.Binary.SerdeObjectPrefix.Bound` (hash `09d66aa04c8ff8bc`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.Bound (bs : List UInt8) (start baseHL baseF : ℕ) (saved : Bool) :
+  WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds :=
+  fun phase i hl F cap =>
+    ∃ pre,
+      WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved ∧
+        cap = WNear.Binary.ScratchMixedTrace.endCap 0 pre ∧
+          F = WNear.Binary.ScratchMixedTrace.endFreeBound baseF 0 pre ∧
+            baseHL ≤ hl ∧
+              hl ≤
+                baseHL +
+                  65536 *
+                    (WNear.Binary.ScratchMixedTrace.pages 0 pre + if saved = true then 1 else 0)
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.closing` (hash `000000004b606e8e`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.closing (bs : List UInt8) (start baseHL baseF : ℕ) (saved : Bool) :
+  WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs
+    (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved)
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.forget` (hash `00000000f57caa7e`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.forget {bs : List UInt8} {start baseHL baseF i hl F : ℕ} {saved : Bool}
+  {phase : WNear.Binary.SerdeStructObjPhase.Phase} {cap : UInt32}
+  (h : WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved phase i hl F cap) :
+  WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved i hl F cap
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.ignore_conditions` (hash `00000000ff188fb2`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.ignore_conditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (start baseHL baseF : ℕ) (saved : Bool) (K : ℕ → ℕ) (hlen : bs.length ≤ 4194304)
+  (hbase : baseHL + 18230154 ≤ 100663296)
+  (hgas :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved) K) :
+  WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions cfg bs K
+    (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved)
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.initial` (hash `00000000691d4fa7`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.initial (bs : List UInt8) (start baseHL baseF : ℕ) :
+  WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF false (WNear.Binary.SerdeStructObjPhase.Phase.member true)
+    start baseHL baseF 0
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.key_conditions` (hash `000000001c639a86`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.key_conditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (start baseHL baseF : ℕ) (saved : Bool) (K : ℕ → ℕ) (hlen : bs.length ≤ 4194304)
+  (hbase : baseHL + 18230154 ≤ 100663296)
+  (hgas :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved) K) :
+  WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg 2048 bs
+    (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved) K
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.segment` (hash `000000005e494b3c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.segment (bs : List UInt8) (start baseHL baseF i j hl F hl' : ℕ)
+  (saved saved' : Bool) (phase next : WNear.Binary.SerdeStructObjPhase.Phase) (cap : UInt32)
+  (seg : WNear.Binary.ScratchMixedTrace.Segment) (extra : ℕ)
+  (hslot : (if saved = true then 1 else 0) + extra = if saved' = true then 1 else 0)
+  (hstep :
+    ∀ (pre : WNear.Binary.ScratchMixedTrace.Batches),
+      WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved →
+        WNear.Binary.SerdeObjectPrefix.Prefix bs start next j (pre ++ [seg]) saved')
+  (h : WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved phase i hl F cap) (hlo : hl ≤ hl')
+  (hhi : hl' ≤ hl + 65536 * (WNear.Binary.ScratchMixedTrace.Segment.pages cap seg + extra)) :
+  WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved' next j hl'
+    (WNear.Binary.ScratchMixedTrace.Segment.endFreeBound F cap seg)
+    (WNear.Binary.ScratchMixedTrace.Segment.next cap seg)
+```
+
+`WNear.Binary.SerdeObjectPrefix.Bound.value_conditions` (hash `00000000753246e7`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.value_conditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (start baseHL baseF : ℕ) (K : ℕ → ℕ) (hlen : bs.length ≤ 4194304) (hbase : baseHL + 18230154 ≤ 100663296)
+  (hbaseF : 1 ≤ baseF)
+  (hgas :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF false) K) :
+  WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions cfg 2048 bs
+    (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF false)
+    (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF true) K
+```
+
+`WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges` (hash `f12765c2c4320d52`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (key : String) (i hl F : ℕ) (cap : UInt32) (rest : List UInt8)
+    (ops : List WNear.Binary.SerdeIgnTrace.Op),
+    key ≠ "account_id" →
+      B (WNear.Binary.SerdeStructObjPhase.Phase.value key) i hl F cap →
+        cap.toNat < 2 ^ 25 →
+          i ≤ bs.length →
+            bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 →
+              WNear.Binary.SerdeIgnMachineTrace.trace
+                    (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+                  some (rest, ops) →
+                hl % 65536 = 0 →
+                  0 < hl →
+                    (166 +
+                            470 *
+                              (bs.length - rest.length -
+                                (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1))) *
+                          cfg.regularOpCost +
+                        WNear.Binary.SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+                      K (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+```
+
+`WNear.Binary.SerdeObjectPrefix.KeyGasCharges` (hash `fb3a4063fc33b4a0`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.KeyGasCharges (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (first : Bool) (i q : ℕ) (key : String) (rest : Wasm.Near.Bytes) (hl F : ℕ) (cap : UInt32),
+    i ≤ bs.length →
+      WNear.Binary.SerdeNextKey.keyQ first bs i = some q →
+        NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest) →
+          B (WNear.Binary.SerdeStructObjPhase.Phase.member first) i hl F cap →
+            cap.toNat < 2 ^ 25 →
+              hl % 65536 = 0 →
+                0 < hl →
+                  WNear.Binary.SerdeKeyReuse.preciseCost cfg F cap bs key.toUTF8.toList rest q ≤
+                    K q
+```
+
+`WNear.Binary.SerdeObjectPrefix.ValueGasCharges` (hash `45d26483771d3979`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.ValueGasCharges (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (i j : ℕ) (a : WNear.AccountId) (rest : Wasm.Near.Bytes) (hl F : ℕ) (cap : UInt32),
+    i ≤ bs.length →
+      bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 →
+        j =
+            i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1 +
+              WNear.Binary.SerdeRead.wsLen
+                (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) →
+          bs[j]? = some 34 →
+            NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest) →
+              WNear.SerdeStructModel.valueAs WNear.account
+                    (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+                  some (a, rest) →
+                B (WNear.Binary.SerdeStructObjPhase.Phase.value "account_id") i hl F cap →
+                  cap.toNat < 2 ^ 25 →
+                    hl % 65536 = 0 →
+                      0 < hl →
+                        WNear.Binary.SerdeValueReuse.valueCost cfg F cap bs (↑a).toUTF8.toList
+                            rest (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) j ≤
+                          K (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+```
+
+## Bridge.Functions.SerdePrefixObject
+
+`WNear.Binary.SerdeObjectPrefix.core_forget` (hash `000000000a05d729`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.core_forget {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de : UInt32) (live : List (ℕ × ℕ)) (bs : List UInt8) (start baseHL baseF : ℕ)
+  (saved : Bool) (phase : WNear.Binary.SerdeStructObjPhase.Phase) (i : ℕ) :
+  WNear.Binary.SerdeStructObjKeyState.core n maxP ta alloc idx de live
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved phase) i ⊢
+    WNear.Binary.SerdeStructObjKeyState.core n maxP ta alloc idx de live
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved) i
+```
+
+`WNear.Binary.SerdeObjectPrefix.f78_prefix_cost` (hash `0000000043ca8237`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.f78_prefix_cost {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 43 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out de ptr idx : UInt32) (ob bs : List UInt8)
+  (i : ℕ) (live : List (ℕ × ℕ)) (Cd : Iris.IProp GF) [Iris.BI.Persistent Cd] (baseHL baseF : ℕ) (ptrS sl : UInt32)
+  (K646 K169 K81 : ℕ → ℕ) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0)
+  (hi : i ≤ bs.length) (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup baseHL baseF)
+  (hkeys :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        false)
+      K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        true)
+      K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        false)
+      K169)
+  (hignored :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        false)
+      K81)
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        true)
+      K81)
+  (N : ℕ) (a : WNear.AccountId) (rF : List UInt8)
+  (hb0 : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none
+        (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+      some (some a, rF)) :
+  WNear.Binary.SerdeStructObjModelState.code n 2048 inst mi A ∗
+      (WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗ Cd) ∗
+        A 228 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[36]! inst WNear.Binary.f228 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f78 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 de]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                n ↦[wms][ out.toNat ] ob ∗
+                  WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                    n ↦[wms][ de.toNat + 24 ] [128] ∗
+                      WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                        WNear.Binary.SerdeValueState.tables n ∗
+                          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                            n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+                              WNear.Binary.SerdeValueState.scratchPre n 2048 baseHL live baseF de ptrS 0 sl))
+      (fun x =>
+        40 * cfg.regularOpCost +
+          WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account)
+            WNear.Binary.SerdeIgnObject.ignored bs N i)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+              n ↦[wms][ de.toNat + 24 ] [128] ∗
+                ∃ p cap,
+                  n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                    n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                      n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 cap ∗
+                        n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
+                          ⌜p ≠ 0⌝ ∗
+                            WNear.Binary.SerdeStructObjKeyState.member n 2048 ta (A 578) idx de live
+                                (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+                                (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true) (bs.length - rF.length)
+                                (some (a, p, cap)) ∗
+                              WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rF.length))
+```
+
+`WNear.Binary.SerdeObjectPrefix.member_forget` (hash `00000000781244e1`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.member_forget {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de : UInt32) (live : List (ℕ × ℕ)) (bs : List UInt8) (start baseHL baseF : ℕ)
+  (phase : WNear.Binary.SerdeStructObjPhase.Phase) (i : ℕ) (seen : Option (WNear.AccountId × UInt32 × UInt32)) :
+  WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta alloc idx de live
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF false)
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF true) phase i seen ⊢
+    WNear.Binary.SerdeStructObjKeyState.member n maxP ta alloc idx de live
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true) i seen
+```
+
+`WNear.Binary.SerdeObjectPrefix.member_initial` (hash `00000000a435496c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.member_initial {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de ptrS sl : UInt32) (live : List (ℕ × ℕ)) (bs : List UInt8) (baseHL baseF start : ℕ) :
+  WNear.Binary.AllocFirstFit.vt n 1057464 idx ta alloc ∗
+      WNear.Binary.SerdeValueState.tables n ∗
+        n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+          n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+            WNear.Binary.SerdeValueState.scratchPre n maxP baseHL live baseF de ptrS 0 sl ⊢
+    WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta alloc idx de live
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF false)
+      (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF true)
+      (WNear.Binary.SerdeStructObjPhase.Phase.member true) start none
+```
+
+`WNear.Binary.SerdeObjectPrefix.object_loop_prefix` (hash `000000001f9364ea`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.object_loop_prefix {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 42 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out de ptr idx x2 x3 x4 x5 : UInt32)
+  (ob bs : List UInt8) (i : ℕ) (live : List (ℕ × ℕ)) (Cd : Iris.IProp GF) [Iris.BI.Persistent Cd] (baseHL baseF : ℕ)
+  (K646 K169 K81 : ℕ → ℕ) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0)
+  (hi : i ≤ bs.length) (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup baseHL baseF)
+  (hkeys :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        false)
+      K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        true)
+      K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        false)
+      K169)
+  (hignored :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        false)
+      K81)
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF
+        true)
+      K81)
+  (N : ℕ) (a : WNear.AccountId) (rF : List UInt8)
+  (hb0 : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none
+        (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+      some (some a, rF)) :
+  WNear.Binary.SerdeStructObjModelState.code n 2048 inst mi A ∗ WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗ Cd ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f228 Cg
+      (fun args =>
+        iprop(⌜args =
+                [Wasm.Value.i32 out, Wasm.Value.i32 de, Wasm.Value.i32 x2, Wasm.Value.i32 x3, Wasm.Value.i32 x4,
+                  Wasm.Value.i32 x5]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                n ↦[wms][ out.toNat ] ob ∗
+                  WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                    n ↦[wms][ de.toNat + 24 ] [128] ∗
+                      WNear.Binary.SerdeStructObjPhaseReaders.member n 2048 ta (A 578) idx de live
+                        (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+                          baseHL baseF false)
+                        (WNear.Binary.SerdeObjectPrefix.Bound bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+                          baseHL baseF true)
+                        (WNear.Binary.SerdeStructObjPhase.Phase.member true)
+                        (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) none))
+      (fun x =>
+        WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account)
+          WNear.Binary.SerdeIgnObject.ignored bs N i)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+              n ↦[wms][ de.toNat + 24 ] [128] ∗
+                ∃ p cap,
+                  n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                    n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                      n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 cap ∗
+                        n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
+                          ⌜p ≠ 0⌝ ∗
+                            WNear.Binary.SerdeStructObjPhaseReaders.member n 2048 ta (A 578) idx de live
+                                (WNear.Binary.SerdeObjectPrefix.Bound bs
+                                  (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF false)
+                                (WNear.Binary.SerdeObjectPrefix.Bound bs
+                                  (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) baseHL baseF true)
+                                WNear.Binary.SerdeStructObjPhase.Phase.done (bs.length - rF.length) (some (a, p, cap)) ∗
+                              WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rF.length))
+```
+
+## Bridge.Functions.SerdePrefixParser
+
+`WNear.Binary.SerdeObjectPrefix.f65_prefix` (hash `00000000953bd01e`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.f65_prefix {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 45 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out ptr idx : UInt32) (ob bs : List UInt8)
+  (a : WNear.AccountId) (rest : List UInt8) (N k mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hsp : 448 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (K646 K169 K81 : ℕ → ℕ)
+  (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup mlen F)
+  (hkeys :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K169)
+  (hignored :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K81)
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hk : k = bs.length - rest.length) (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          WNear.Binary.DropVec.dropCode inst mi A ∗
+            WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗
+              A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f65 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 ptr, Wasm.Value.i32 (UInt32.ofNat bs.length)]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n 2048 mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      n ↦[wms][ ptr.toNat ] bs ∗
+                        n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                          n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                            n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                              n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                                n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes))
+      (fun x =>
+        45 * cfg.regularOpCost +
+          ((975 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+            WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account)
+              WNear.Binary.SerdeIgnObject.ignored bs N 0))
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ ptr.toNat ] bs ∗
+                  n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                    n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                      n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                        n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                          n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+                            ∃ p c len,
+                              n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                                n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                                  n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                                    n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                                      WNear.Binary.SerdeObjectMixedTrace.cleanLedgerObject n mlen F live
+                                        (↑a).toUTF8.toList p c len)
+```
+
+`WNear.Binary.SerdeObjectPrefix.f66_prefix` (hash `00000000e2290579`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.f66_prefix {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 44 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
+  (a : WNear.AccountId) (rest : List UInt8) (N k mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hsp : 432 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (K646 K169 K81 : ℕ → ℕ)
+  (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup mlen F)
+  (hkeys :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K169)
+  (hignored :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K81)
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hk : k = bs.length - rest.length) (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          WNear.Binary.DropVec.dropCode inst mi A ∗ WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f66 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 rd]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 432) 432 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n 2048 mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      WNear.Binary.ArgsLeaves.sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
+                        n ↦[wms][ ptr.toNat ] bs ∗
+                          n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                            n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                              n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                                n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                                  n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes))
+      (fun x =>
+        (975 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+          WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account)
+            WNear.Binary.SerdeIgnObject.ignored bs N 0)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 432) 432 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                WNear.Binary.ArgsLeaves.sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
+                  n ↦[wms][ ptr.toNat ] bs ∗
+                    n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                      n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                        n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                            n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+                              ∃ p c len,
+                                n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                                  n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                                    n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                                      n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                                        WNear.Binary.SerdeObjectMixedTrace.cleanLedgerObject n mlen F live
+                                          (↑a).toUTF8.toList p c len)
+```
+
+## Bridge.Functions.SerdePrefixProvider
+
+`WNear.Binary.SerdeObjectPrefix.f65_prefix_room` (hash `000000005b84f44f`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.f65_prefix_room {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 45 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out ptr idx : UInt32) (ob bs : List UInt8)
+  (a : WNear.AccountId) (rest : List UInt8) (N k mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hsp : 448 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (K646 K169 K81 : ℕ → ℕ)
+  (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup mlen F)
+  (hkeys :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K169)
+  (hignored :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K81)
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hk : k = bs.length - rest.length) (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          WNear.Binary.DropVec.dropCode inst mi A ∗
+            WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗
+              A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f65 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 ptr, Wasm.Value.i32 (UInt32.ofNat bs.length)]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n 2048 mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      n ↦[wms][ ptr.toNat ] bs ∗
+                        n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                          n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                            n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                              n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                                n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes))
+      (fun x =>
+        45 * cfg.regularOpCost +
+          ((975 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+            WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account)
+              WNear.Binary.SerdeIgnObject.ignored bs N 0))
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ ptr.toNat ] bs ∗
+                  n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                    n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                      n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                        n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                          n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+                            ∃ hl',
+                              ⌜WNear.Binary.LookupMapOps.HeapRoomK 6 hl' 2048⌝ ∗
+                                WNear.Binary.BalanceOf297AbsentCall.okAtFixed n out a live hl' (F + 43))
+```
+
+`WNear.Binary.SerdeObjectPrefix.prefix_deployed_parser_provider` (hash `00000000f8c0b363`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.prefix_deployed_parser_provider (cfg : Wasm.Near.RuntimeConfig) (bs rest : List UInt8)
+  (a : WNear.AccountId) (N : ℕ) (K646 K169 K81 : ℕ → ℕ) (hlen : bs.length ≤ 4194304)
+  (hkeys :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K646)
+  (hkeysSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K646)
+  (hvalues :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K169)
+  (hignored :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K81)
+  (hignoredSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length) :
+  WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider cfg bs a
+    (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost cfg.wasm K646 K169 K81 bs rest N) 44
+```
+
+`WNear.Binary.SerdeObjectPrefix.prefix_parser_contract` (hash `0000000047c191b4`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.prefix_parser_contract {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta Cg : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (gt : Wasm.GlobalType) (sp out ptr idx : UInt32)
+  (ob bs rest : List UInt8) (a : WNear.AccountId) (N mlen F : ℕ) (live : List (ℕ × ℕ)) (hd : d + 45 < lim.maxCallDepth)
+  (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hsp : 448 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (K646 K169 K81 : ℕ → ℕ)
+  (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup mlen F)
+  (hkeys :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K169)
+  (hignored :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F false) K81)
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+      (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) mlen F true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length) :
+  WNear.Binary.BalanceOf297AbsentCall.ParserCallContract cfg lim d inst mi A n g ta Cg gt sp out ptr idx ob bs a mlen
+    live F (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost cfg K646 K169 K81 bs rest N) (F + 43)
+    (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCode n inst mi A)
+    (WNear.Binary.SerdeObjectMixedTrace.ledgerParserStatics n)
+```
+
+`WNear.Binary.SerdeObjectPrefix.prefix_parser_family` (hash `00000000eaf2c14a`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.prefix_parser_family {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (gt : Wasm.GlobalType) (bs rest : List UInt8) (a : WNear.AccountId)
+  (N F : ℕ) (K646 K169 K81 : ℕ → ℕ) (hlen : bs.length ≤ 4194304) (hF : 1 ≤ F)
+  (hkeys :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len F false) K646)
+  (hkeysSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len F true) K646)
+  (hvalues :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.ValueGasCharges cfg bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len F false) K169)
+  (hignored :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len F false) K81)
+  (hignoredSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges cfg bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len F true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length) :
+  WNear.Binary.BalanceOf297AbsentCall.ParserFamily cfg lim inst mi A n g ta gt bs a F
+    (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost cfg K646 K169 K81 bs rest N) (F + 43)
+    (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCode n inst mi A)
+```
+
+`WNear.Binary.SerdeObjectPrefix.prefix_provider_plan` (hash `00000000f40ab6c2`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.prefix_provider_plan (cfg : WNear.Config) (ctx : NearInterface.Context)
+  (raw : WNear.RawStorage) (modelSt : Option WNear.State) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8)
+  (N size : ℕ) (K646 K169 K81 : ℕ → ℕ) (hlen : bs.length ≤ 4194304)
+  (hkeys :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K646)
+  (hkeysSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K646)
+  (hvalues :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.ValueGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K169)
+  (hignored :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K81)
+  (hignoredSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length)
+  (hbudget :
+    WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg size raw modelSt ctx S a
+      (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost ctx.protocol.wasm K646 K169 K81 bs rest N) 44) :
+  WNear.Binary.BalanceOf297AbsentCall.AbsentParserPlan cfg size raw modelSt ctx S a bs
+```
+
+`WNear.Binary.SerdeObjectPrefix.prefix_refines_init` (hash `000000007eb0e3ce`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.prefix_refines_init (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (raw : WNear.RawStorage) (ctx : NearInterface.Context) (S : WNear.State)
+  (a : WNear.AccountId) (bs rest : List UInt8) (N : ℕ) (K646 K169 K81 : ℕ → ℕ) (hlen : bs.length ≤ 4194304)
+  (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw) (hm : ctx.method = "ft_balance_of")
+  (hl : WNear.Binary.FtTotalSupplyMethod.LimitsV86 ctx.protocol)
+  (hkeys :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K646)
+  (hkeysSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.KeyGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K646)
+  (hvalues :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.ValueGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K169)
+  (hignored :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K81)
+  (hignoredSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length)
+  (hbudget :
+    WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg size raw (some S) ctx S a
+      (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost ctx.protocol.wasm K646 K169 K81 bs rest N) 44)
+  (hargs : ctx.args = bs) (hrep : (WNear.wnear cfg).Represents raw (some S)) (ha : a ∉ S.registered) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx (some S) (WNear.Call.ftBalanceOf a);
+  (∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a) ≤ ctx.gasLimit →
+        ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx (some S) (WNear.Call.ftBalanceOf a)) →
+          NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧
+            r.usedGas ≤ (WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a)) ∧
+      (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+        NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+## Bridge.Functions.SerdePrefixSelectedKey
+
+`WNear.Binary.SerdeObjectPrefix.Bound.selected_key_charges` (hash `0000000000037948`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Bound.selected_key_charges (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (start baseHL baseF : ℕ) (saved : Bool) :
+  WNear.Binary.SerdeObjectPrefix.KeyGasCharges cfg bs (WNear.Binary.SerdeObjectPrefix.Bound bs start baseHL baseF saved)
+    (WNear.Binary.SerdeObjectPrefix.selectedKeyCost cfg bs start baseF)
+```
+
+`WNear.Binary.SerdeObjectPrefix.selected_key_refines_init` (hash `00000000636f1f64`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.selected_key_refines_init (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (raw : WNear.RawStorage) (ctx : NearInterface.Context) (S : WNear.State)
+  (a : WNear.AccountId) (bs rest : List UInt8) (N : ℕ) (K169 K81 : ℕ → ℕ) (hlen : bs.length ≤ 4194304)
+  (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw) (hm : ctx.method = "ft_balance_of")
+  (hl : WNear.Binary.FtTotalSupplyMethod.LimitsV86 ctx.protocol)
+  (hvalues :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.ValueGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K169)
+  (hignored :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 false) K81)
+  (hignoredSaved :
+    ∀ (len : ℕ),
+      len = WNear.Binary.InitialState.memLen ∨
+          len = WNear.Binary.VecFromElem.grownLen WNear.Binary.InitialState.memLen (UInt32.ofNat bs.length) →
+        WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges ctx.protocol.wasm bs
+          (WNear.Binary.SerdeObjectPrefix.Bound bs (WNear.Binary.SerdeRead.wsLen bs + 1) len 1 true) K81)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length)
+  (hbudget :
+    WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg size raw (some S) ctx S a
+      (WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost ctx.protocol.wasm
+        (WNear.Binary.SerdeObjectPrefix.selectedKeyCost ctx.protocol.wasm bs (WNear.Binary.SerdeRead.wsLen bs + 1) 1)
+        K169 K81 bs rest N)
+      44)
+  (hargs : ctx.args = bs) (hrep : (WNear.wnear cfg).Represents raw (some S)) (ha : a ∉ S.registered) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx (some S) (WNear.Call.ftBalanceOf a);
+  (∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a) ≤ ctx.gasLimit →
+        ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx (some S) (WNear.Call.ftBalanceOf a)) →
+          NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧
+            r.usedGas ≤ (WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a)) ∧
+      (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+        NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+## Bridge.Functions.SerdePrefixTrace
+
+`WNear.Binary.SerdeObjectPrefix.KeyWitness` (hash `dfc0145ede42c143`)
+
+```lean
+inductive WNear.Binary.SerdeObjectPrefix.KeyWitness (bs : List UInt8) (start q : ℕ) : Type
+| WNear.Binary.SerdeObjectPrefix.KeyWitness.mk {bs : List UInt8} {start q : ℕ} (first : Bool) (cursor : ℕ) (key : String)
+  (rest : List UInt8) (history : WNear.Binary.ScratchMixedTrace.Batches) (saved : Bool)
+  (prefixModel :
+    WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first) cursor history
+      saved)
+  (quote : WNear.Binary.SerdeNextKey.keyQ first bs cursor = some q)
+  (model : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest)) :
+  WNear.Binary.SerdeObjectPrefix.KeyWitness bs start q
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.before_index` (hash `0000000082f1b908`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.before_index {bs : List UInt8} {start i : ℕ}
+  {phase : WNear.Binary.SerdeStructObjPhase.Phase} {pre : WNear.Binary.ScratchMixedTrace.Batches} {saved : Bool}
+  (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved) (n : ℕ)
+  (st : WNear.Binary.SerdeObjectPrefix.TraceState) :
+  (n < List.length pre + if phase = WNear.Binary.SerdeStructObjPhase.Phase.done then 1 else 0) →
+    WNear.Binary.SerdeObjectPrefix.trajectory bs start n = some st → st.2.1 < i
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.canonical_trace` (hash `00000000bb0cc44c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.canonical_trace {bs : List UInt8} {start i : ℕ}
+  {phase : WNear.Binary.SerdeStructObjPhase.Phase} {pre : WNear.Binary.ScratchMixedTrace.Batches} {saved : Bool}
+  (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved) :
+  WNear.Binary.SerdeObjectPrefix.trajectory bs start
+      (List.length pre + if phase = WNear.Binary.SerdeStructObjPhase.Phase.done then 1 else 0) =
+    some (phase, i, pre, saved)
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.history_length` (hash `0000000088642fc9`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.history_length {bs : List UInt8} {start i : ℕ}
+  {phase : WNear.Binary.SerdeStructObjPhase.Phase} {pre : WNear.Binary.ScratchMixedTrace.Batches} {saved : Bool}
+  (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved) : start ≤ i ∧ List.length pre ≤ i - start
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.key_history_unique` (hash `00000000e0225e5b`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.key_history_unique {bs : List UInt8} {start i i' q : ℕ} {first first' : Bool}
+  {pre pre' : WNear.Binary.ScratchMixedTrace.Batches} {saved saved' : Bool} {key key' : String}
+  {rest rest' : List UInt8}
+  (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first) i pre saved)
+  (h' :
+    WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first') i' pre'
+      saved')
+  (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q) (hq' : WNear.Binary.SerdeNextKey.keyQ first' bs i' = some q)
+  (hs : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest))
+  (hs' : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key', rest')) : pre = pre' ∧ saved = saved'
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.key_no_later_start` (hash `000000007eb98b5d`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.key_no_later_start {bs : List UInt8} {start i i' q : ℕ} {first first' : Bool}
+  {pre pre' : WNear.Binary.ScratchMixedTrace.Batches} {saved saved' : Bool} {key : String} {rest : List UInt8}
+  (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first) i pre saved)
+  (h' :
+    WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first') i' pre'
+      saved')
+  (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q) (hq' : WNear.Binary.SerdeNextKey.keyQ first' bs i' = some q)
+  (hs : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest))
+  (hlt : List.length pre < List.length pre') : False
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.progress` (hash `0000000096108fe5`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.progress {bs : List UInt8} {start i : ℕ}
+  {phase : WNear.Binary.SerdeStructObjPhase.Phase} {pre : WNear.Binary.ScratchMixedTrace.Batches} {saved : Bool}
+  (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved) : start + List.length pre ≤ i
+```
+
+`WNear.Binary.SerdeObjectPrefix.Prefix.unique_at_cursor` (hash `000000009d32df9d`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.Prefix.unique_at_cursor {bs : List UInt8} {start i : ℕ}
+  {phase phase' : WNear.Binary.SerdeStructObjPhase.Phase} {pre pre' : WNear.Binary.ScratchMixedTrace.Batches}
+  {saved saved' : Bool} (h : WNear.Binary.SerdeObjectPrefix.Prefix bs start phase i pre saved)
+  (h' : WNear.Binary.SerdeObjectPrefix.Prefix bs start phase' i pre' saved') :
+  phase = phase' ∧ pre = pre' ∧ saved = saved'
+```
+
+`WNear.Binary.SerdeObjectPrefix.TraceState` (hash `f57e2b81db0f377b`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.TraceState : Type :=
+  WNear.Binary.SerdeStructObjPhase.Phase × ℕ × WNear.Binary.ScratchMixedTrace.Batches × Bool
+```
+
+`WNear.Binary.SerdeObjectPrefix.advance` (hash `9053a5e32cf13980`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.advance (bs : List UInt8) (st : WNear.Binary.SerdeObjectPrefix.TraceState) :
+  Option WNear.Binary.SerdeObjectPrefix.TraceState :=
+  do
+    let __x ← WNear.Binary.SerdeObjectPrefix.step bs st.1 st.2.1 st.2.2.2
+    match __x with
+      | (phase, i, segment, saved) => pure (phase, i, st.2.2.1 ++ segment.toList, saved)
+```
+
+`WNear.Binary.SerdeObjectPrefix.before_succ` (hash `0000000070e984d9`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.before_succ {bs : List UInt8} {start n current : ℕ}
+  {previous : WNear.Binary.SerdeObjectPrefix.TraceState}
+  (hp : WNear.Binary.SerdeObjectPrefix.trajectory bs start n = some previous) (hstrict : previous.2.1 < current)
+  (hb :
+    ∀ (m : ℕ) (st : WNear.Binary.SerdeObjectPrefix.TraceState),
+      m < n → WNear.Binary.SerdeObjectPrefix.trajectory bs start m = some st → st.2.1 < previous.2.1)
+  (m : ℕ) (st : WNear.Binary.SerdeObjectPrefix.TraceState) :
+  m < n + 1 → WNear.Binary.SerdeObjectPrefix.trajectory bs start m = some st → st.2.1 < current
+```
+
+`WNear.Binary.SerdeObjectPrefix.selectedKeyCost` (hash `daf294db020cfd3a`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.selectedKeyCost (cfg : Wasm.Near.WasmConfig) (bs : List UInt8) (start baseF q : ℕ) : ℕ :=
+  if h : Nonempty (WNear.Binary.SerdeObjectPrefix.KeyWitness bs start q) then
+    have w := Classical.choice h;
+    WNear.Binary.SerdeKeyReuse.preciseCost cfg
+      (WNear.Binary.ScratchMixedTrace.endFreeBound baseF 0 w.history)
+      (WNear.Binary.ScratchMixedTrace.endCap 0 w.history) bs w.key.toUTF8.toList w.rest q
+  else 0
+```
+
+`WNear.Binary.SerdeObjectPrefix.selectedKeyCost_of_witness` (hash `00000000ca69e95c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.selectedKeyCost_of_witness (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (start baseF q : ℕ) (w : WNear.Binary.SerdeObjectPrefix.KeyWitness bs start q) :
+  WNear.Binary.SerdeKeyReuse.preciseCost cfg (WNear.Binary.ScratchMixedTrace.endFreeBound baseF 0 w.history)
+      (WNear.Binary.ScratchMixedTrace.endCap 0 w.history) bs w.key.toUTF8.toList w.rest q =
+    WNear.Binary.SerdeObjectPrefix.selectedKeyCost cfg bs start baseF q
+```
+
+`WNear.Binary.SerdeObjectPrefix.step` (hash `0655d859da4c4612`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.step (bs : List UInt8) :
+  WNear.Binary.SerdeStructObjPhase.Phase →
+    ℕ →
+      Bool → Option (WNear.Binary.SerdeStructObjPhase.Phase × ℕ × Option WNear.Binary.ScratchMixedTrace.Segment × Bool) :=
+  fun x x_1 x_2 =>
+    match x, x_1, x_2 with
+    | WNear.Binary.SerdeStructObjPhase.Phase.member first, i, saved =>
+      if bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 125 then
+        some
+          (WNear.Binary.SerdeStructObjPhase.Phase.done,
+            i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1, none, saved)
+      else do
+        let q ← WNear.Binary.SerdeNextKey.keyQ first bs i
+        let __x ← NearInterface.Json.stringBody (List.drop q bs) []
+        match __x with
+          | (decoded, rest) => do
+            let key ← decoded
+            pure
+                (WNear.Binary.SerdeStructObjPhase.Phase.value key, bs.length - List.length rest,
+                  some
+                    (WNear.Binary.ScratchMixedTrace.Segment.append
+                      (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) [])),
+                  saved)
+    | WNear.Binary.SerdeStructObjPhase.Phase.value key, i, saved =>
+      if bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 then
+        have v := i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1;
+        if key = "account_id" then
+          if saved = true then none
+          else do
+            let __x ← WNear.SerdeStructModel.valueAs WNear.account (List.drop v bs)
+            match __x with
+              | (fst, rest) =>
+                pure
+                  (WNear.Binary.SerdeStructObjPhase.Phase.member false, bs.length - rest.length,
+                    some
+                      (WNear.Binary.ScratchMixedTrace.Segment.append
+                        (WNear.Binary.ParseStrSuccess.appendChunks
+                          (List.drop (v + WNear.Binary.SerdeRead.wsLen (List.drop v bs) + 1) bs)
+                          [])),
+                    true)
+        else do
+          let __x ← WNear.Binary.SerdeIgnMachineTrace.trace (List.drop v bs)
+          match __x with
+            | (rest, ops) =>
+              pure
+                (WNear.Binary.SerdeStructObjPhase.Phase.member false, bs.length - rest.length,
+                  some (WNear.Binary.ScratchMixedTrace.Segment.frames ops), saved)
+      else none
+    | WNear.Binary.SerdeStructObjPhase.Phase.done, x, x_3 => none
+```
+
+`WNear.Binary.SerdeObjectPrefix.step_close` (hash `00000000aafd455d`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.step_close {bs : List UInt8} {first : Bool} {i : ℕ} (saved : Bool)
+  (hb : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 125) :
+  WNear.Binary.SerdeObjectPrefix.step bs (WNear.Binary.SerdeStructObjPhase.Phase.member first) i saved =
+    some
+      (WNear.Binary.SerdeStructObjPhase.Phase.done, i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1, none, saved)
+```
+
+`WNear.Binary.SerdeObjectPrefix.step_key` (hash `00000000e0ab9e6b`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.step_key {bs : List UInt8} {first : Bool} {i q : ℕ} {key : String} {rest : List UInt8}
+  (saved : Bool) (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q)
+  (hs : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest)) :
+  WNear.Binary.SerdeObjectPrefix.step bs (WNear.Binary.SerdeStructObjPhase.Phase.member first) i saved =
+    some
+      (WNear.Binary.SerdeStructObjPhase.Phase.value key, bs.length - rest.length,
+        some
+          (WNear.Binary.ScratchMixedTrace.Segment.append
+            (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) [])),
+        saved)
+```
+
+`WNear.Binary.SerdeObjectPrefix.step_value` (hash `000000009e9441df`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.step_value {bs : List UInt8} {key : String} {i e : ℕ}
+  {seg : WNear.Binary.ScratchMixedTrace.Segment} (saved : Bool) (hdup : key = "account_id" → saved = false)
+  (hc : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58) (heb : e ≤ bs.length)
+  (hv :
+    WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key
+      (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) e seg) :
+  WNear.Binary.SerdeObjectPrefix.step bs (WNear.Binary.SerdeStructObjPhase.Phase.value key) i saved =
+    some (WNear.Binary.SerdeStructObjPhase.Phase.member false, e, some seg, saved || key == "account_id")
+```
+
+`WNear.Binary.SerdeObjectPrefix.trajectory` (hash `72052c75d16cb7f9`)
+
+```lean
+def WNear.Binary.SerdeObjectPrefix.trajectory (bs : List UInt8) (start : ℕ) :
+  ℕ → Option WNear.Binary.SerdeObjectPrefix.TraceState :=
+  fun x => Nat.brecOn x (WNear.Binary.SerdeObjectPrefix.trajectory._f bs start)
+```
+
 ## Bridge.Functions.SerdeRetainedScratchDrop
 
 `WNear.Binary.SerdeObjectMixedTrace.f68_retained_scratch` (hash `000000006365a0a3`)
@@ -14573,6 +15729,377 @@ def WNear.Binary.SerdeStructObjPhase.seenRes {GF : Iris.BundledGFunctors} [WasmL
               n ↦[wms][ s.toNat + 44 ] WasmLogic.bytes32 cap ∗
                 n ↦[wms][ s.toNat + 48 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
                   J i (some (a, p, cap)))
+```
+
+## Bridge.Functions.SerdeStructObjPhaseReaders
+
+`WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions` (hash `985f10c2dc7752ba`)
+
+```lean
+def WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) : Prop :=
+  ∀ (first : Bool) (i j hl F : ℕ) (cap : UInt32),
+    j = i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) →
+      bs[j]? = some 125 →
+        B (WNear.Binary.SerdeStructObjPhase.Phase.member first) i hl F cap →
+          B WNear.Binary.SerdeStructObjPhase.Phase.done (j + 1) hl F cap
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions` (hash `d230a29ca09469f7`)
+
+```lean
+def WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8) (K : ℕ → ℕ)
+  (B : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) : Prop :=
+  ∀ (key : String) (i hl F : ℕ) (cap : UInt32) (r : List UInt8)
+    (ops : List WNear.Binary.SerdeIgnTrace.Op),
+    key ≠ "account_id" →
+      B (WNear.Binary.SerdeStructObjPhase.Phase.value key) i hl F cap →
+        cap.toNat < 2 ^ 25 →
+          i ≤ bs.length →
+            bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 →
+              WNear.Binary.SerdeIgnMachineTrace.trace
+                    (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+                  some (r, ops) →
+                hl % 65536 = 0 →
+                  0 < hl →
+                    hl ≤ 100663296 ∧
+                      (166 +
+                                470 *
+                                  (bs.length - r.length -
+                                    (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1))) *
+                              cfg.regularOpCost +
+                            WNear.Binary.SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+                          K (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) ∧
+                        ∀ (hl' : ℕ),
+                          WNear.Binary.SerdeIgnExecution.HeapTrace hl cap 0 ops hl' →
+                            B (WNear.Binary.SerdeStructObjPhase.Phase.member false)
+                              (bs.length - r.length) hl'
+                              (WNear.Binary.SerdeIgnTrace.endFreeBound F cap 0 ops)
+                              (WNear.Binary.SerdeIgnTrace.endState cap 0 ops).1
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions` (hash `1a061ab1392615b0`)
+
+```lean
+def WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions (cfg : Wasm.Near.WasmConfig) (maxP : ℕ) (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (first : Bool) (i q : ℕ) (key : String) (rest : List UInt8) (hl F : ℕ) (cap : UInt32),
+    i ≤ bs.length →
+      WNear.Binary.SerdeNextKey.keyQ first bs i = some q →
+        NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest) →
+          B (WNear.Binary.SerdeStructObjPhase.Phase.member first) i hl F cap →
+            cap.toNat < 2 ^ 25 →
+              hl % 65536 = 0 →
+                0 < hl →
+                  WNear.Binary.SerdeKeyReuse.keyRoom maxP hl cap (List.drop q bs) ∧
+                    WNear.Binary.SerdeKeyReuse.preciseCost cfg F cap bs key.toUTF8.toList rest q ≤
+                        K q ∧
+                      ∀ (hl' : ℕ),
+                        hl ≤ hl' →
+                          hl' ≤
+                              hl +
+                                WNear.Binary.ScratchGrow.growthPages cap 0
+                                    (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs)
+                                      []) *
+                                  65536 →
+                            B (WNear.Binary.SerdeStructObjPhase.Phase.value key)
+                              (bs.length - rest.length) hl'
+                              (WNear.Binary.ScratchGrow.endFreeBound F cap 0
+                                (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) []))
+                              (WNear.Binary.ScratchGrow.endState cap 0
+                                  (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs)
+                                    [])).1
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds` (hash `bfe85983b49d2509`)
+
+```lean
+def WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds : Type :=
+  WNear.Binary.SerdeStructObjPhase.Phase → WNear.Binary.SerdeStructObjKeyState.Bounds
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions` (hash `0c99d0cf14bf5085`)
+
+```lean
+def WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions (cfg : Wasm.Near.WasmConfig) (maxP : ℕ) (bs : List UInt8)
+  (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (i j : ℕ) (a : WNear.AccountId) (rest : List UInt8) (hl F : ℕ) (cap : UInt32),
+    i ≤ bs.length →
+      bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 →
+        j =
+            i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1 +
+              WNear.Binary.SerdeRead.wsLen
+                (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) →
+          bs[j]? = some 34 →
+            NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest) →
+              WNear.SerdeStructModel.valueAs WNear.account
+                    (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+                  some (a, rest) →
+                B (WNear.Binary.SerdeStructObjPhase.Phase.value "account_id") i hl F cap →
+                  cap.toNat < 2 ^ 25 →
+                    hl % 65536 = 0 →
+                      0 < hl →
+                        WNear.Binary.SerdeErrBox.roomFor4 hl maxP 20 ∧
+                          WNear.Binary.ParseStr.roomRun maxP hl cap [] (List.drop (j + 1) bs) ∧
+                            WNear.Binary.VecFromElem.roomFor
+                                (hl +
+                                  WNear.Binary.ScratchGrow.growthPages cap 0
+                                      (WNear.Binary.ParseStrSuccess.appendChunks
+                                        (List.drop (j + 1) bs) []) *
+                                    65536)
+                                maxP (UInt32.ofNat (↑a).toUTF8.toList.length) ∧
+                              WNear.Binary.SerdeValueReuse.valueCost cfg F cap bs
+                                    (↑a).toUTF8.toList rest
+                                    (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) j ≤
+                                  K (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) ∧
+                                ∀ (hl' : ℕ),
+                                  hl ≤ hl' →
+                                    hl' ≤
+                                        hl +
+                                          (WNear.Binary.ScratchGrow.growthPages cap 0
+                                                (WNear.Binary.ParseStrSuccess.appendChunks
+                                                  (List.drop (j + 1) bs) []) +
+                                              (WNear.Binary.AllocNewCell.cellPages
+                                                  (WNear.Binary.AllocAlloc.wordsOf
+                                                    (UInt32.ofNat (↑a).toUTF8.toList.length))
+                                                  1).toNat) *
+                                            65536 →
+                                      Bsaved (WNear.Binary.SerdeStructObjPhase.Phase.member false)
+                                        (bs.length - rest.length) hl'
+                                        (max
+                                          (WNear.Binary.ScratchGrow.endFreeBound F cap 0
+                                            (WNear.Binary.ParseStrSuccess.appendChunks
+                                              (List.drop (j + 1) bs) []))
+                                          1)
+                                        (WNear.Binary.ScratchGrow.endState cap 0
+                                            (WNear.Binary.ParseStrSuccess.appendChunks
+                                              (List.drop (j + 1) bs) [])).1
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.f228_obj_model_closing` (hash `0000000095dedb6f`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.f228_obj_model_closing {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ)
+  (type : Wasm.FuncType) (htype : type.results = []) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 42 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i maxP : ℕ) (live : List (ℕ × ℕ)) (Cd : Iris.IProp GF)
+  [Iris.BI.Persistent Cd] (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K646 K169 K81 : ℕ → ℕ)
+  (ign : List UInt8 → Option (Unit × List UInt8))
+  (hign : WNear.SerdeStructModel.Agrees ign WNear.SerdeStructModel.valueSkip) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length)
+  (hkeys : WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg maxP bs B K646)
+  (hkeysSaved : WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg maxP bs Bsaved K646)
+  (hvalues : WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions cfg maxP bs B Bsaved K169)
+  (hclose : WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs B)
+  (hcloseSaved : WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs Bsaved)
+  (hignore :
+    WNear.Binary.SerdeStructObjPhase.IgnoreHyp cfg lim inst mi n g Cg gt de ptr bs ign K81
+      (WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta (A 578) idx de live B Bsaved)
+      iprop(WNear.Binary.SerdeStructObjModelState.code n maxP inst mi A ∗ Cd))
+  (N : ℕ) (a : WNear.AccountId) (rF : List UInt8)
+  (hb0 : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account) ign N none
+        (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+      some (some a, rF)) :
+  WNear.Binary.SerdeStructObjModelState.code n maxP inst mi A ∗ Cd ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f228 Cg
+      (fun args =>
+        iprop(⌜args =
+                [Wasm.Value.i32 out, Wasm.Value.i32 de, Wasm.Value.i32 x2, Wasm.Value.i32 x3, Wasm.Value.i32 x4,
+                  Wasm.Value.i32 x5]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                n ↦[wms][ out.toNat ] ob ∗
+                  WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                    n ↦[wms][ de.toNat + 24 ] [128] ∗
+                      WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta (A 578) idx de live B Bsaved
+                        (WNear.Binary.SerdeStructObjPhase.Phase.member true)
+                        (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) none))
+      (fun x =>
+        WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account) ign bs N i)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+              n ↦[wms][ de.toNat + 24 ] [128] ∗
+                ∃ p cap,
+                  n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                    n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                      n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 cap ∗
+                        n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
+                          ⌜p ≠ 0⌝ ∗
+                            WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta (A 578) idx de live B Bsaved
+                                WNear.Binary.SerdeStructObjPhase.Phase.done (bs.length - rF.length) (some (a, p, cap)) ∗
+                              WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rF.length))
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.ignoreHyp_v86` (hash `000000003d5369c8`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.ignoreHyp_v86 {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta Cg : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (gt : Wasm.GlobalType) (idx de ptr : UInt32) (bs : List UInt8)
+  (live : List (ℕ × ℕ)) (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ)
+  (hlen : bs.length ≤ 4194304) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hconditions : WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions cfg bs K B)
+  (hconditionsSaved : WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions cfg bs K Bsaved) (Cd : Iris.IProp GF)
+  [Iris.BI.Persistent Cd]
+  (hcode :
+    Cd ⊢
+      WNear.Binary.SerdeEnds.endCode n 2048 inst mi A ∗
+        A 89 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f89 ∗
+          A 81 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f81 ∗
+            WNear.Binary.SerdeIgnMember.code n 2048 inst mi A) :
+  WNear.Binary.SerdeStructObjPhase.IgnoreHyp cfg lim inst mi n g Cg gt de ptr bs WNear.Binary.SerdeIgnObject.ignored K
+    (WNear.Binary.SerdeStructObjPhaseReaders.member n 2048 ta (A 578) idx de live B Bsaved) Cd
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.keyHyp` (hash `00000000c700815f`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.keyHyp {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ)
+  (n g ta Cg maxP : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (gt : Wasm.GlobalType) (idx de ptr : UInt32)
+  (bs : List UInt8) (live : List (ℕ × ℕ)) (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ)
+  (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hc : WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg maxP bs B K)
+  (hcSaved : WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg maxP bs Bsaved K) (Cd : Iris.IProp GF)
+  [Iris.BI.Persistent Cd]
+  (hcode : Cd ⊢ WNear.Binary.SerdeNextKey.code193 n maxP inst mi A ∗ WNear.Binary.ParseStr.code646 n maxP inst mi A) :
+  WNear.Binary.SerdeStructObjPhase.KeyHyp cfg lim inst mi n g Cg gt de ptr bs K
+    (WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta (A 578) idx de live B Bsaved) Cd
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.member` (hash `5dd59c507ac3fbff`)
+
+```lean
+def WNear.Binary.SerdeStructObjPhaseReaders.member {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de : UInt32) (live : List (ℕ × ℕ))
+  (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (phase : WNear.Binary.SerdeStructObjPhase.Phase)
+  (i : ℕ) : Option (WNear.AccountId × UInt32 × UInt32) → Iris.IProp GF :=
+  fun i x =>
+    match x with
+    | none => WNear.Binary.SerdeStructObjKeyState.core n maxP ta alloc idx de live (B phase) i
+    | some (a, p, cap) =>
+      iprop(⌜cap = UInt32.ofNat (↑a).utf8ByteSize ∧ p ≠ 0⌝ ∗
+          n ↦[wms][ p.toNat ] (↑a).toUTF8.toList ∗
+            WNear.Binary.SerdeStructObjKeyState.core n maxP ta alloc idx de
+              ((p.toNat, cap.toNat) :: live) (Bsaved phase) i)
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.member_closing` (hash `000000003ff0efdb`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.member_closing {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de : UInt32) (live : List (ℕ × ℕ)) (bs : List UInt8)
+  (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds)
+  (hB : WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs B)
+  (hSaved : WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs Bsaved) (first : Bool) (i j : ℕ)
+  (seen : Option (WNear.AccountId × UInt32 × UInt32)) (hj : j = i + WNear.Binary.SerdeRead.wsLen (List.drop i bs))
+  (hb : bs[j]? = some 125) :
+  WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta alloc idx de live B Bsaved
+      (WNear.Binary.SerdeStructObjPhase.Phase.member first) i seen ⊢
+    WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta alloc idx de live B Bsaved
+      WNear.Binary.SerdeStructObjPhase.Phase.done (j + 1) seen
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing` (hash `00000000a236178b`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ)
+  (type : Wasm.FuncType) (htype : type.results = []) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 42 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i : ℕ) (live : List (ℕ × ℕ)) (Cd : Iris.IProp GF)
+  [Iris.BI.Persistent Cd] (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K646 K169 K81 : ℕ → ℕ)
+  (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0)
+  (hi : i ≤ bs.length) (hkeys : WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg 2048 bs B K646)
+  (hkeysSaved : WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions cfg 2048 bs Bsaved K646)
+  (hvalues : WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions cfg 2048 bs B Bsaved K169)
+  (hclose : WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs B)
+  (hcloseSaved : WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions bs Bsaved)
+  (hignored : WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions cfg bs K81 B)
+  (hignoredSaved : WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions cfg bs K81 Bsaved) (N : ℕ)
+  (a : WNear.AccountId) (rF : List UInt8) (hb0 : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none
+        (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+      some (some a, rF)) :
+  WNear.Binary.SerdeStructObjModelState.code n 2048 inst mi A ∗ WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗ Cd ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f228 Cg
+      (fun args =>
+        iprop(⌜args =
+                [Wasm.Value.i32 out, Wasm.Value.i32 de, Wasm.Value.i32 x2, Wasm.Value.i32 x3, Wasm.Value.i32 x4,
+                  Wasm.Value.i32 x5]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                n ↦[wms][ out.toNat ] ob ∗
+                  WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                    n ↦[wms][ de.toNat + 24 ] [128] ∗
+                      WNear.Binary.SerdeStructObjPhaseReaders.member n 2048 ta (A 578) idx de live B Bsaved
+                        (WNear.Binary.SerdeStructObjPhase.Phase.member true)
+                        (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) none))
+      (fun x =>
+        WNear.Binary.SerdeStructObj.costObj cfg K646 K169 K81 (WNear.SerdeStructModel.valueAs WNear.account)
+          WNear.Binary.SerdeIgnObject.ignored bs N i)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+              n ↦[wms][ de.toNat + 24 ] [128] ∗
+                ∃ p cap,
+                  n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                    n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                      n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 cap ∗
+                        n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
+                          ⌜p ≠ 0⌝ ∗
+                            WNear.Binary.SerdeStructObjPhaseReaders.member n 2048 ta (A 578) idx de live B Bsaved
+                                WNear.Binary.SerdeStructObjPhase.Phase.done (bs.length - rF.length) (some (a, p, cap)) ∗
+                              WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rF.length))
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.seen_core` (hash `00000000d6f9de29`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.seen_core {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de s : UInt32) (live : List (ℕ × ℕ))
+  (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (phase : WNear.Binary.SerdeStructObjPhase.Phase)
+  (i : ℕ) (seen : Option WNear.AccountId) :
+  WNear.Binary.SerdeStructObjPhase.seenRes n s
+      (WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta alloc idx de live B Bsaved phase) i seen ⊢
+    ∃ C lv,
+      ⌜C = B ∨ C = Bsaved⌝ ∗
+        WNear.Binary.SerdeStructObjKeyState.core n maxP ta alloc idx de lv (C phase) i ∗
+          ∀ next j,
+            WNear.Binary.SerdeStructObjKeyState.core n maxP ta alloc idx de lv (C next) j -∗
+              WNear.Binary.SerdeStructObjPhase.seenRes n s
+                (WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta alloc idx de live B Bsaved next) j seen
+```
+
+`WNear.Binary.SerdeStructObjPhaseReaders.valueHyp` (hash `00000000c13bde91`)
+
+```lean
+theorem WNear.Binary.SerdeStructObjPhaseReaders.valueHyp {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ)
+  (n g ta Cg maxP : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (gt : Wasm.GlobalType) (idx de ptr : UInt32)
+  (bs : List UInt8) (live : List (ℕ × ℕ)) (B Bsaved : WNear.Binary.SerdeStructObjPhaseReaders.PhaseBounds) (K : ℕ → ℕ)
+  (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+  (hc : WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions cfg maxP bs B Bsaved K) (Cd : Iris.IProp GF)
+  [Iris.BI.Persistent Cd]
+  (hcode :
+    Cd ⊢
+      WNear.Binary.SerdeEnds.endCode n maxP inst mi A ∗
+        A 89 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f89 ∗
+          A 169 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f169 ∗
+            WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗ WNear.Binary.ParseStr.code646 n maxP inst mi A) :
+  WNear.Binary.SerdeStructObjPhase.ValueHyp cfg lim inst mi n g Cg gt de ptr bs
+    (WNear.SerdeStructModel.valueAs WNear.account) K
+    (WNear.Binary.SerdeStructObjPhaseReaders.member n maxP ta (A 578) idx de live B Bsaved) Cd
 ```
 
 ## Bridge.Functions.SerdeStructObjState

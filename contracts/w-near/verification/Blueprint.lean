@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdePrefixSelectedKey
 import Bridge.Functions.SerdeObjectPrefix
 import Bridge.Functions.SerdeObjectProviderPrecise
 import Bridge.Functions.SerdeObjectLedgerGas
@@ -2683,3 +2684,272 @@ attribute [blueprint "frontier:prefix-pending-key"
   (title := /-- Pending field comes from the exact preceding key read -/)
   (statement := /-- Every value phase exposes its actual preceding key model, saved-account state and retained-history extension. Physical reader constructors and deterministic prefix gas remain missing. -/)]
   WNear.Binary.SerdeObjectPrefix.Prefix.pending_key
+
+attribute [blueprint "frontier:prefix-reader-lens"
+  (title := /-- Phase reader lends and restores exact owned state -/)
+  (statement := /-- The saved descriptor retains account bytes while the parser core moves between explicitly chosen phases. No credit cell is added. -/)]
+  WNear.Binary.SerdeStructObjPhaseReaders.seen_core
+
+attribute [blueprint "frontier:prefix-reader-key-conditions"
+  (title := /-- Phase key room, gas and closure contract -/)
+  (statement := /-- Requires the actual pending-key state transition and precise trace charge. A concrete prefix constructor is checked below; the general interface stays Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions
+
+attribute [blueprint "frontier:prefix-reader-value-conditions"
+  (title := /-- Phase account room, gas and closure contract -/)
+  (statement := /-- Consumes pending account_id, actual accepted value model and exact allocator endpoints. Its general instances remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions
+
+attribute [blueprint "frontier:prefix-reader-ignore-conditions"
+  (title := /-- Phase ignored-reader reachable contract -/)
+  (statement := /-- Consumes the actual unknown key and preserves the retained state at the next-member phase. Its general instances remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions
+
+attribute [blueprint "frontier:prefix-reader-close-conditions"
+  (title := /-- Phase final-brace bounds contract -/)
+  (statement := /-- Exact member-to-done bound transport. Concrete prefixes construct it; the general interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions
+
+attribute [blueprint "frontier:prefix-reader-key"
+  (title := /-- Actual precise key reader records its field phase -/)
+  (statement := /-- The actual f193 contract builds the phase-aware key hypothesis from named pure room/gas/endpoint conditions. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.keyHyp
+
+attribute [blueprint "frontier:prefix-reader-value"
+  (title := /-- Actual account reader uses pending account_id -/)
+  (statement := /-- Actual f205/model/owned-string proof constructs the known-field phase call with its actual model and endpoint conditions. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.valueHyp
+
+attribute [blueprint "frontier:prefix-reader-ignore"
+  (title := /-- Full actual ignored reader moves its unknown-key phase -/)
+  (statement := /-- The actual f201/full f81 constructor supplies reader room and capacity while named phase gas/state conditions remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.ignoreHyp_v86
+
+attribute [blueprint "frontier:prefix-reader-closing"
+  (title := /-- Owned member resources survive phase closing -/)
+  (statement := /-- Physical member/core transport follows the named final-brace conditions without changing owned account bytes. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.member_closing
+
+attribute [blueprint "frontier:prefix-reader-object"
+  (title := /-- Actual loop composes phase-aware key and value readers -/)
+  (statement := /-- Concrete actual key and account readers feed the checked field-phase loop; ignored and closing instances remain named. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.f228_obj_model_closing
+
+attribute [blueprint "frontier:prefix-reader-full-object"
+  (title := /-- Full actual ignored reader feeds the phase-aware loop -/)
+  (statement := /-- All actual reader behavior and loop branches compose at unchanged costObj. Pure phase reader conditions remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing
+
+attribute [blueprint "frontier:prefix-bound-forget"
+  (title := /-- Actual prefix coordinates imply the physical ledger -/)
+  (statement := /-- The exact successful prefix and retained capacity/free bound imply the unchanged coarse Ledger. This is a pure implication. -/)]
+  WNear.Binary.SerdeObjectPrefix.Bound.forget
+
+attribute [blueprint "frontier:prefix-bound-initial"
+  (title := /-- Exact physical prefix starts at the initial cursor -/)
+  (statement := /-- Initial empty scratch is available at the first-member phase and specified body cursor only. -/)]
+  WNear.Binary.SerdeObjectPrefix.Bound.initial
+
+attribute [blueprint "frontier:prefix-bound-segment"
+  (title := /-- Physical prefix extends one actual segment -/)
+  (statement := /-- Preserves exact retained capacity/free state and physical page bounds while extending an actual phase transition. -/)]
+  WNear.Binary.SerdeObjectPrefix.Bound.segment
+
+attribute [blueprint "frontier:prefix-bound-close"
+  (title := /-- Actual prefix constructs final-brace conditions -/)
+  (statement := /-- The recorded brace transition supplies member-to-done bounds with the same retained history. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.closing
+
+attribute [blueprint "frontier:prefix-key-gas"
+  (title := /-- Remaining prefix key gas allowance -/)
+  (statement := /-- Only the actual precise key trace charge at a reachable member prefix must fit K. The selected exact charge instance is constructed below; the generic interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.KeyGasCharges
+
+attribute [blueprint "frontier:prefix-value-gas"
+  (title := /-- Remaining prefix account gas allowance -/)
+  (statement := /-- Only the actual accepted account charge at its known-field prefix must fit K. Generic and selected-charge funding remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.ValueGasCharges
+
+attribute [blueprint "frontier:prefix-ignore-gas"
+  (title := /-- Remaining prefix ignored gas allowance -/)
+  (statement := /-- Only the actual unknown-field reader charge at its prefix must fit K; the selected instance and whole-model budget remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges
+
+attribute [blueprint "frontier:prefix-bound-key"
+  (title := /-- Prefix room and state leave only key gas -/)
+  (statement := /-- Actual prefix history supplies physical key room and exact post-key state, assuming only the selected K allowance. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.key_conditions
+
+attribute [blueprint "frontier:prefix-bound-value"
+  (title := /-- Prefix account room and state leave only value gas -/)
+  (statement := /-- Uses actual accepted value models, the one account allocation and positive base free bound to construct all physical conditions. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.value_conditions
+
+attribute [blueprint "frontier:prefix-bound-ignore"
+  (title := /-- Prefix ignored room and state leave only ignored gas -/)
+  (statement := /-- Actual unknown-key models, full heap trace and retained prefix supply room and state closure. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.ignore_conditions
+
+attribute [blueprint "frontier:prefix-actual-loop"
+  (title := /-- Actual object loop with exact prefix gas contracts -/)
+  (statement := /-- All physical reader and closing conditions are constructed from the actual prefix. The original recurrence retains only selected key/value/ignore gas and physical setup premises. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.object_loop_prefix
+
+attribute [blueprint "frontier:prefix-core-forget"
+  (title := /-- Owned prefix core supplies original ledger resources -/)
+  (statement := /-- Forgets only the pure prefix witness while retaining every owned parser and allocator resource. -/)]
+  WNear.Binary.SerdeObjectPrefix.core_forget
+
+attribute [blueprint "frontier:prefix-member-forget"
+  (title := /-- Owned prefix member supplies original result ownership -/)
+  (statement := /-- Keeps the saved account descriptor and bytes while passing exact physical resources to existing cleanup callers. -/)]
+  WNear.Binary.SerdeObjectPrefix.member_forget
+
+attribute [blueprint "frontier:prefix-member-initial"
+  (title := /-- Raw empty scratch initializes owned prefix state -/)
+  (statement := /-- Instantiates the first-member prefix at its exact cursor from actual stack-independent parser/scratch resources. -/)]
+  WNear.Binary.SerdeObjectPrefix.member_initial
+
+attribute [blueprint "frontier:prefix-wrapper"
+  (title := /-- Actual prefix object reaches f78 and original ownership -/)
+  (statement := /-- Actual f78 wrapper composes raw initialization, the phase-aware object and checked physical state handoff. Selected gas and setup remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f78_prefix_cost
+
+attribute [blueprint "frontier:prefix-from-trait"
+  (title := /-- Actual prefix costs survive f66 and scratch cleanup -/)
+  (statement := /-- Checks EOF/trailing whitespace, result moves and retained scratch drop with the unchanged cost recurrence and owned account result. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f66_prefix
+
+attribute [blueprint "frontier:prefix-from-slice"
+  (title := /-- Actual prefix parser restores its slice caller -/)
+  (statement := /-- The actual f65 slice entry composes the prefix f66 contract with unchanged frames, resources and observations. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_prefix
+
+attribute [blueprint "frontier:prefix-from-slice-room"
+  (title := /-- Prefix parser supplies balance execution room -/)
+  (statement := /-- The original checked owned-account handoff supplies balance room and output free bound. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_prefix_room
+
+attribute [blueprint "frontier:prefix-parser-call"
+  (title := /-- Prefix parser supplies the shared call contract -/)
+  (statement := /-- Packages actual prefix parsing for the shared balance pipeline. Reader gas and setup remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.prefix_parser_contract
+
+attribute [blueprint "frontier:prefix-parser-family"
+  (title := /-- Actual initial memory instantiates prefix setup -/)
+  (statement := /-- Input allocation outcomes construct physical setup. Remaining reader premises are the three prefix gas allowances. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.prefix_parser_family
+
+attribute [blueprint "frontier:prefix-deployed-provider"
+  (title := /-- Actual-code provider retains prefix costs -/)
+  (statement := /-- Persistent function cells instantiate the same prefix parser family, retaining output F=44. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.prefix_deployed_parser_provider
+
+attribute [blueprint "frontier:prefix-provider-plan"
+  (title := /-- Prefix provider couples to original model budget -/)
+  (statement := /-- The same K functions and actual provider are coupled to unchanged ProviderModelBudget. Total funding is still Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.prefix_provider_plan
+
+attribute [blueprint "frontier:prefix-receipt"
+  (title := /-- Full receipt refinement from actual prefix parser -/)
+  (statement := /-- Safety, sufficient-resource Matches/used gas and arbitrary-resource Matches-or-failure rollback/log-prefix compose with original observations. Prefix gas and model budget remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.prefix_refines_init
+
+attribute [blueprint "frontier:prefix-progress"
+  (title := /-- Every retained segment advances the cursor -/)
+  (statement := /-- Actual key/value transitions bound retained history by consumed bytes. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.progress
+
+attribute [blueprint "frontier:prefix-history-length"
+  (title := /-- Retained prefix history fits consumed bytes -/)
+  (statement := /-- The actual prefix has finitely many segments within the consumed input. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.history_length
+
+attribute [blueprint "frontier:prefix-step-key"
+  (title := /-- Functional trace matches actual key transition -/)
+  (statement := /-- The actual key model determines the value phase, exact cursor, retained string segment and saved flag. -/)]
+  WNear.Binary.SerdeObjectPrefix.step_key
+
+attribute [blueprint "frontier:prefix-step-close"
+  (title := /-- Functional trace matches final brace -/)
+  (statement := /-- The actual brace determines the done phase and exact cursor without adding scratch history. -/)]
+  WNear.Binary.SerdeObjectPrefix.step_close
+
+attribute [blueprint "frontier:prefix-step-value"
+  (title := /-- Functional trace matches account or ignored value -/)
+  (statement := /-- Actual accepted account and ignored models determine the next phase, exact scratch segment and saved flag. -/)]
+  WNear.Binary.SerdeObjectPrefix.step_value
+
+attribute [blueprint "frontier:prefix-canonical"
+  (title := /-- Every actual prefix lies on one functional trace -/)
+  (statement := /-- Maps the actual history to its exact functional trace index. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.canonical_trace
+
+attribute [blueprint "frontier:prefix-before-succ"
+  (title := /-- Strict cursor order extends one trace step -/)
+  (statement := /-- A previous trace state and strict cursor advance transport every earlier cursor bound. -/)]
+  WNear.Binary.SerdeObjectPrefix.before_succ
+
+attribute [blueprint "frontier:prefix-before-index"
+  (title := /-- Earlier actual trace states have smaller cursors -/)
+  (statement := /-- Strict cursor ordering excludes recurrent states at a reached cursor. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.before_index
+
+attribute [blueprint "frontier:prefix-cursor-unique"
+  (title := /-- Reached cursor uniquely determines phase and history -/)
+  (statement := /-- The actual cursor determines its phase, retained scratch history and saved-account flag. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.unique_at_cursor
+
+attribute [blueprint "frontier:prefix-key-no-later"
+  (title := /-- Key body cannot recur at a later member prefix -/)
+  (statement := /-- The next key phase lies at or beyond q, while any member quoting that q must precede q. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.key_no_later_start
+
+attribute [blueprint "frontier:prefix-key-history"
+  (title := /-- Key charge index uniquely determines retained history -/)
+  (statement := /-- The actual key-body q determines exact scratch history and saved-account state, even when comparing different member cursors. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.key_history_unique
+
+attribute [blueprint "frontier:prefix-key-selected-cost"
+  (title := /-- Selected key charge equals every actual witness -/)
+  (statement := /-- Classical selection of the unique actual prefix yields its exact preciseCost; this does not bound the sum by the whole model allowance. -/)]
+  WNear.Binary.SerdeObjectPrefix.selectedKeyCost_of_witness
+
+attribute [blueprint "frontier:prefix-selected-key-instance"
+  (title := /-- Selected exact key charge instantiates prefix key gas -/)
+  (statement := /-- For each saved state, the unique retained history supplies KeyGasCharges for selectedKeyCost. The generic interface remains Open and total model funding remains missing. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.selected_key_charges
+
+attribute [blueprint "frontier:prefix-selected-key-receipt"
+  (title := /-- Selected key charge reaches full receipt refinement -/)
+  (statement := /-- Instantiates both actual key hypotheses at selectedKeyCost. Full receipt observations remain Conditional on value/ignored gas and the unchanged whole-model budget; no generic key gas witness is assumed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.selected_key_refines_init

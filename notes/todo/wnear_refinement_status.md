@@ -33,6 +33,60 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: exact prefix reader pipeline and selected key charge
+
+Actual phase-aware f193 keys, f205 account values and f201/full f81 ignored
+values now compose into the deployed object loop. Their member state records
+the pending field name, retained scratch coordinates and saved-account bytes,
+with the same single gas-credit cell and original costObj recurrence.
+
+Bound records an actual successful Prefix and exact endCap/endFreeBound of its
+retained segment history. Checked constructors supply key/account/ignored room,
+physical heap effects, state closure and final-brace transport from this prefix.
+Raw empty scratch initializes the exact first-member cursor. Owned core/member
+handoffs preserve every physical resource while supplying the original ledger
+postcondition for cleanup and balance execution.
+
+This actual prefix loop reaches f78, f66, f65, EOF/whitespace checking, account
+moves and scratch cleanup, the shared parser-call family, actual-code deployed
+provider, original-budget plan and full initialized absent-account receipt
+refinement. Input allocation outcomes instantiate physical setup. Safety,
+sufficient-resource Matches/used gas, arbitrary-resource Matches-or-failure
+rollback/log-prefix, output free bound 44 and all original observations remain.
+These compositions are Conditional on named prefix gas and the exact unchanged
+ProviderModelBudget. Generic reader conditions and gas contracts stay Open.
+
+The pure functional step/trajectory now agrees with every actual key, account,
+ignored and brace transition. Retained segments advance the actual cursor;
+earlier trace indices have strictly smaller cursors. Thus a reached cursor
+uniquely determines phase, history and saved-account flag. A key-body charge
+index q also determines its retained caller history: a later member at the same
+q would precede q while following the previous key result at or beyond q.
+These uniqueness and model-correspondence results are Proven.
+
+selectedKeyCost chooses that unique actual charge. Its kernel proof agrees with
+every successful witness, including exact retained capacity/free state and
+actual borrowed/copied string result. Bound.selected_key_charges instantiates
+both saved-state key hypotheses for this chosen function. A full receipt
+specialization uses those instances and no generic key-gas premise: remaining
+premises are selected value/ignored gas and the same ProviderModelBudget. The
+generic prefix KeyGasCharges interface remains Open; choosing an exact charge
+does not prove its sum fits the original whole-method allowance.
+
+Next work is selecting exact account/ignored charges and bounding the complete
+actual charge sum, using retained mixed-growth accounting and disjoint consumed
+input, within the original model budget. No argument coefficient, environment,
+observation or admission rule is weakened. All prior KeyConditions,
+ValueConditions and IgnoreHyp interfaces, remaining methods/states/inputs and
+pinned protocol premises remain visible and unresolved where appropriate.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T12:37:02+00:00 for proof source `1e8e5f859ceae85117d729b0964cac95a1cfeb10a821a8fa740086c6bfeb6369`. All 93 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical, including original parser and loop contracts. The
+exact admission frontier and original gas/observation/domain statements are
+unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: pending-field phases integrated into actual object callers
 
 The actual f228 object loop now tracks member(first), value(exact key) and done

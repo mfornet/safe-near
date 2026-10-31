@@ -6329,6 +6329,716 @@
       "required_type_dependencies": [],
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 3333817202
+    },
+    {
+      "id": "prefix-reader-lens",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.seen_core",
+      "title": "Phase reader lends and restores exact owned state",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-lens",
+      "notes": "The saved descriptor retains account bytes while the parser core moves between explicitly chosen phases. No credit cell is added.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3606699561
+    },
+    {
+      "id": "prefix-reader-key-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.KeyConditions",
+      "title": "Phase key room, gas and closure contract",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-reader-key-conditions",
+      "notes": "Requires the actual pending-key state transition and precise trace charge. A concrete prefix constructor is checked below; the general interface stays Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1875215643316721072
+    },
+    {
+      "id": "prefix-reader-value-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.ValueConditions",
+      "title": "Phase account room, gas and closure contract",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-reader-value-conditions",
+      "notes": "Consumes pending account_id, actual accepted value model and exact allocator endpoints. Its general instances remain Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 907986387716755589
+    },
+    {
+      "id": "prefix-reader-ignore-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.IgnoreConditions",
+      "title": "Phase ignored-reader reachable contract",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-reader-ignore-conditions",
+      "notes": "Consumes the actual unknown key and preserves the retained state at the next-member phase. Its general instances remain Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 15145784340439656951
+    },
+    {
+      "id": "prefix-reader-close-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.ClosingConditions",
+      "title": "Phase final-brace bounds contract",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-reader-close-conditions",
+      "notes": "Exact member-to-done bound transport. Concrete prefixes construct it; the general interface remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 10979512845661065914
+    },
+    {
+      "id": "prefix-reader-key",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.keyHyp",
+      "title": "Actual precise key reader records its field phase",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-key",
+      "notes": "The actual f193 contract builds the phase-aware key hypothesis from named pure room/gas/endpoint conditions.",
+      "required_type_dependencies": [
+        "prefix-reader-key-conditions",
+        "phase-key-hyp"
+      ],
+      "required_proof_dependencies": [
+        "precise-next-key-reader",
+        "prefix-reader-lens"
+      ],
+      "reviewed_shape_hash": 3338699103
+    },
+    {
+      "id": "prefix-reader-value",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.valueHyp",
+      "title": "Actual account reader uses pending account_id",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-value",
+      "notes": "Actual f205/model/owned-string proof constructs the known-field phase call with its actual model and endpoint conditions.",
+      "required_type_dependencies": [
+        "prefix-reader-value-conditions",
+        "phase-value-hyp"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3241926289
+    },
+    {
+      "id": "prefix-reader-ignore",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.ignoreHyp_v86",
+      "title": "Full actual ignored reader moves its unknown-key phase",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-ignore",
+      "notes": "The actual f201/full f81 constructor supplies reader room and capacity while named phase gas/state conditions remain explicit.",
+      "required_type_dependencies": [
+        "prefix-reader-ignore-conditions",
+        "phase-ignore-hyp"
+      ],
+      "required_proof_dependencies": [
+        "ignored-colon-v86",
+        "prefix-reader-lens"
+      ],
+      "reviewed_shape_hash": 1028876744
+    },
+    {
+      "id": "prefix-reader-closing",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.member_closing",
+      "title": "Owned member resources survive phase closing",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-closing",
+      "notes": "Physical member/core transport follows the named final-brace conditions without changing owned account bytes.",
+      "required_type_dependencies": [
+        "prefix-reader-close-conditions"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1072754651
+    },
+    {
+      "id": "prefix-reader-object",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.f228_obj_model_closing",
+      "title": "Actual loop composes phase-aware key and value readers",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-object",
+      "notes": "Concrete actual key and account readers feed the checked field-phase loop; ignored and closing instances remain named.",
+      "required_type_dependencies": [
+        "prefix-reader-key-conditions",
+        "prefix-reader-value-conditions",
+        "prefix-reader-close-conditions",
+        "phase-ignore-hyp"
+      ],
+      "required_proof_dependencies": [
+        "phase-object-loop",
+        "prefix-reader-key",
+        "prefix-reader-value",
+        "prefix-reader-closing"
+      ],
+      "reviewed_shape_hash": 2514410351
+    },
+    {
+      "id": "prefix-reader-full-object",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing",
+      "title": "Full actual ignored reader feeds the phase-aware loop",
+      "kind": "theorem",
+      "label": "frontier:prefix-reader-full-object",
+      "notes": "All actual reader behavior and loop branches compose at unchanged costObj. Pure phase reader conditions remain explicit.",
+      "required_type_dependencies": [
+        "prefix-reader-key-conditions",
+        "prefix-reader-value-conditions",
+        "prefix-reader-ignore-conditions",
+        "prefix-reader-close-conditions"
+      ],
+      "required_proof_dependencies": [
+        "prefix-reader-object",
+        "prefix-reader-ignore"
+      ],
+      "reviewed_shape_hash": 2721453963
+    },
+    {
+      "id": "prefix-bound-forget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.forget",
+      "title": "Actual prefix coordinates imply the physical ledger",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-forget",
+      "notes": "The exact successful prefix and retained capacity/free bound imply the unchanged coarse Ledger. This is a pure implication.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-ledger"
+      ],
+      "reviewed_shape_hash": 4118588030
+    },
+    {
+      "id": "prefix-bound-initial",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.initial",
+      "title": "Exact physical prefix starts at the initial cursor",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-initial",
+      "notes": "Initial empty scratch is available at the first-member phase and specified body cursor only.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1763528615
+    },
+    {
+      "id": "prefix-bound-segment",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.segment",
+      "title": "Physical prefix extends one actual segment",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-segment",
+      "notes": "Preserves exact retained capacity/free state and physical page bounds while extending an actual phase transition.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1581861692
+    },
+    {
+      "id": "prefix-bound-close",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.closing",
+      "title": "Actual prefix constructs final-brace conditions",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-close",
+      "notes": "The recorded brace transition supplies member-to-done bounds with the same retained history.",
+      "required_type_dependencies": [
+        "prefix-reader-close-conditions"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1264610958
+    },
+    {
+      "id": "prefix-key-gas",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.KeyGasCharges",
+      "title": "Remaining prefix key gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-key-gas",
+      "notes": "Only the actual precise key trace charge at a reachable member prefix must fit K. The selected exact charge instance is constructed below; the generic interface remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 18102852450346316960
+    },
+    {
+      "id": "prefix-value-gas",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.ValueGasCharges",
+      "title": "Remaining prefix account gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-value-gas",
+      "notes": "Only the actual accepted account charge at its known-field prefix must fit K. Generic and selected-charge funding remain unresolved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 5031194249528162681
+    },
+    {
+      "id": "prefix-ignore-gas",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.IgnoreGasCharges",
+      "title": "Remaining prefix ignored gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:prefix-ignore-gas",
+      "notes": "Only the actual unknown-field reader charge at its prefix must fit K; the selected instance and whole-model budget remain unresolved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 17376969574422023506
+    },
+    {
+      "id": "prefix-bound-key",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.key_conditions",
+      "title": "Prefix room and state leave only key gas",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-key",
+      "notes": "Actual prefix history supplies physical key room and exact post-key state, assuming only the selected K allowance.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-reader-key-conditions"
+      ],
+      "required_proof_dependencies": [
+        "prefix-bound-segment",
+        "prefix-bound-forget",
+        "ledger-key-room"
+      ],
+      "reviewed_shape_hash": 476289670
+    },
+    {
+      "id": "prefix-bound-value",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.value_conditions",
+      "title": "Prefix account room and state leave only value gas",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-value",
+      "notes": "Uses actual accepted value models, the one account allocation and positive base free bound to construct all physical conditions.",
+      "required_type_dependencies": [
+        "prefix-value-gas",
+        "prefix-reader-value-conditions"
+      ],
+      "required_proof_dependencies": [
+        "prefix-bound-segment",
+        "prefix-bound-forget",
+        "ledger-account-room"
+      ],
+      "reviewed_shape_hash": 1966229223
+    },
+    {
+      "id": "prefix-bound-ignore",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.ignore_conditions",
+      "title": "Prefix ignored room and state leave only ignored gas",
+      "kind": "theorem",
+      "label": "frontier:prefix-bound-ignore",
+      "notes": "Actual unknown-key models, full heap trace and retained prefix supply room and state closure.",
+      "required_type_dependencies": [
+        "prefix-ignore-gas",
+        "prefix-reader-ignore-conditions"
+      ],
+      "required_proof_dependencies": [
+        "prefix-bound-segment",
+        "prefix-bound-forget"
+      ],
+      "reviewed_shape_hash": 4279799730
+    },
+    {
+      "id": "prefix-actual-loop",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.object_loop_prefix",
+      "title": "Actual object loop with exact prefix gas contracts",
+      "kind": "theorem",
+      "label": "frontier:prefix-actual-loop",
+      "notes": "All physical reader and closing conditions are constructed from the actual prefix. The original recurrence retains only selected key/value/ignore gas and physical setup premises.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "prefix-reader-full-object",
+        "prefix-bound-key",
+        "prefix-bound-value",
+        "prefix-bound-ignore",
+        "prefix-bound-close"
+      ],
+      "reviewed_shape_hash": 529753322
+    },
+    {
+      "id": "prefix-core-forget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.core_forget",
+      "title": "Owned prefix core supplies original ledger resources",
+      "kind": "theorem",
+      "label": "frontier:prefix-core-forget",
+      "notes": "Forgets only the pure prefix witness while retaining every owned parser and allocator resource.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-bound-forget"
+      ],
+      "reviewed_shape_hash": 168154921
+    },
+    {
+      "id": "prefix-member-forget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.member_forget",
+      "title": "Owned prefix member supplies original result ownership",
+      "kind": "theorem",
+      "label": "frontier:prefix-member-forget",
+      "notes": "Keeps the saved account descriptor and bytes while passing exact physical resources to existing cleanup callers.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-core-forget"
+      ],
+      "reviewed_shape_hash": 2014463201
+    },
+    {
+      "id": "prefix-member-initial",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.member_initial",
+      "title": "Raw empty scratch initializes owned prefix state",
+      "kind": "theorem",
+      "label": "frontier:prefix-member-initial",
+      "notes": "Instantiates the first-member prefix at its exact cursor from actual stack-independent parser/scratch resources.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-bound-initial"
+      ],
+      "reviewed_shape_hash": 2754955628
+    },
+    {
+      "id": "prefix-wrapper",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f78_prefix_cost",
+      "title": "Actual prefix object reaches f78 and original ownership",
+      "kind": "theorem",
+      "label": "frontier:prefix-wrapper",
+      "notes": "Actual f78 wrapper composes raw initialization, the phase-aware object and checked physical state handoff. Selected gas and setup remain explicit.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "prefix-actual-loop",
+        "prefix-member-initial",
+        "prefix-member-forget",
+        "ledger-wrapper-generic"
+      ],
+      "reviewed_shape_hash": 1137345079
+    },
+    {
+      "id": "prefix-from-trait",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f66_prefix",
+      "title": "Actual prefix costs survive f66 and scratch cleanup",
+      "kind": "theorem",
+      "label": "frontier:prefix-from-trait",
+      "notes": "Checks EOF/trailing whitespace, result moves and retained scratch drop with the unchanged cost recurrence and owned account result.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "prefix-wrapper",
+        "ledger-scratch-cleanup",
+        "ledger-final-bounds"
+      ],
+      "reviewed_shape_hash": 3794339193
+    },
+    {
+      "id": "prefix-from-slice",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_prefix",
+      "title": "Actual prefix parser restores its slice caller",
+      "kind": "theorem",
+      "label": "frontier:prefix-from-slice",
+      "notes": "The actual f65 slice entry composes the prefix f66 contract with unchanged frames, resources and observations.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "prefix-from-trait"
+      ],
+      "reviewed_shape_hash": 2503725086
+    },
+    {
+      "id": "prefix-from-slice-room",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_prefix_room",
+      "title": "Prefix parser supplies balance execution room",
+      "kind": "theorem",
+      "label": "frontier:prefix-from-slice-room",
+      "notes": "The original checked owned-account handoff supplies balance room and output free bound.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "prefix-from-slice",
+        "ledger-result-room"
+      ],
+      "reviewed_shape_hash": 1535439951
+    },
+    {
+      "id": "prefix-parser-call",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.prefix_parser_contract",
+      "title": "Prefix parser supplies the shared call contract",
+      "kind": "theorem",
+      "label": "frontier:prefix-parser-call",
+      "notes": "Packages actual prefix parsing for the shared balance pipeline. Reader gas and setup remain explicit.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup",
+        "parser-call-contract"
+      ],
+      "required_proof_dependencies": [
+        "prefix-from-slice-room"
+      ],
+      "reviewed_shape_hash": 1203868084
+    },
+    {
+      "id": "prefix-parser-family",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.prefix_parser_family",
+      "title": "Actual initial memory instantiates prefix setup",
+      "kind": "theorem",
+      "label": "frontier:prefix-parser-family",
+      "notes": "Input allocation outcomes construct physical setup. Remaining reader premises are the three prefix gas allowances.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "prefix-parser-call",
+        "ledger-input-bounds"
+      ],
+      "reviewed_shape_hash": 3941777738
+    },
+    {
+      "id": "prefix-deployed-provider",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.prefix_deployed_parser_provider",
+      "title": "Actual-code provider retains prefix costs",
+      "kind": "theorem",
+      "label": "frontier:prefix-deployed-provider",
+      "notes": "Persistent function cells instantiate the same prefix parser family, retaining output F=44.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "deployed-parser-provider"
+      ],
+      "required_proof_dependencies": [
+        "prefix-parser-family",
+        "ledger-parser-code",
+        "parser-family-code-transport"
+      ],
+      "reviewed_shape_hash": 4173378403
+    },
+    {
+      "id": "prefix-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.prefix_provider_plan",
+      "title": "Prefix provider couples to original model budget",
+      "kind": "theorem",
+      "label": "frontier:prefix-provider-plan",
+      "notes": "The same K functions and actual provider are coupled to unchanged ProviderModelBudget. Total funding is still Open.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "provider-model-budget",
+        "absent-parser-plan"
+      ],
+      "required_proof_dependencies": [
+        "prefix-deployed-provider"
+      ],
+      "reviewed_shape_hash": 4094342850
+    },
+    {
+      "id": "prefix-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.prefix_refines_init",
+      "title": "Full receipt refinement from actual prefix parser",
+      "kind": "theorem",
+      "label": "frontier:prefix-receipt",
+      "notes": "Safety, sufficient-resource Matches/used gas and arbitrary-resource Matches-or-failure rollback/log-prefix compose with original observations. Prefix gas and model budget remain explicit.",
+      "required_type_dependencies": [
+        "prefix-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "prefix-provider-plan",
+        "provider-plan-receipt-initial"
+      ],
+      "reviewed_shape_hash": 2125521870
+    },
+    {
+      "id": "prefix-progress",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.progress",
+      "title": "Every retained segment advances the cursor",
+      "kind": "theorem",
+      "label": "frontier:prefix-progress",
+      "notes": "Actual key/value transitions bound retained history by consumed bytes.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2517667813
+    },
+    {
+      "id": "prefix-history-length",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.history_length",
+      "title": "Retained prefix history fits consumed bytes",
+      "kind": "theorem",
+      "label": "frontier:prefix-history-length",
+      "notes": "The actual prefix has finitely many segments within the consumed input.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-progress"
+      ],
+      "reviewed_shape_hash": 2288267209
+    },
+    {
+      "id": "prefix-step-key",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.step_key",
+      "title": "Functional trace matches actual key transition",
+      "kind": "theorem",
+      "label": "frontier:prefix-step-key",
+      "notes": "The actual key model determines the value phase, exact cursor, retained string segment and saved flag.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3769343595
+    },
+    {
+      "id": "prefix-step-close",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.step_close",
+      "title": "Functional trace matches final brace",
+      "kind": "theorem",
+      "label": "frontier:prefix-step-close",
+      "notes": "The actual brace determines the done phase and exact cursor without adding scratch history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2868725085
+    },
+    {
+      "id": "prefix-step-value",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.step_value",
+      "title": "Functional trace matches account or ignored value",
+      "kind": "theorem",
+      "label": "frontier:prefix-step-value",
+      "notes": "Actual accepted account and ignored models determine the next phase, exact scratch segment and saved flag.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2660516319
+    },
+    {
+      "id": "prefix-canonical",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.canonical_trace",
+      "title": "Every actual prefix lies on one functional trace",
+      "kind": "theorem",
+      "label": "frontier:prefix-canonical",
+      "notes": "Maps the actual history to its exact functional trace index.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-step-key",
+        "prefix-step-close",
+        "prefix-step-value"
+      ],
+      "reviewed_shape_hash": 3138176076
+    },
+    {
+      "id": "prefix-before-succ",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.before_succ",
+      "title": "Strict cursor order extends one trace step",
+      "kind": "theorem",
+      "label": "frontier:prefix-before-succ",
+      "notes": "A previous trace state and strict cursor advance transport every earlier cursor bound.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1894352089
+    },
+    {
+      "id": "prefix-before-index",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.before_index",
+      "title": "Earlier actual trace states have smaller cursors",
+      "kind": "theorem",
+      "label": "frontier:prefix-before-index",
+      "notes": "Strict cursor ordering excludes recurrent states at a reached cursor.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-canonical",
+        "prefix-before-succ"
+      ],
+      "reviewed_shape_hash": 2196879624
+    },
+    {
+      "id": "prefix-cursor-unique",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.unique_at_cursor",
+      "title": "Reached cursor uniquely determines phase and history",
+      "kind": "theorem",
+      "label": "frontier:prefix-cursor-unique",
+      "notes": "The actual cursor determines its phase, retained scratch history and saved-account flag.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-canonical",
+        "prefix-before-index"
+      ],
+      "reviewed_shape_hash": 2637356957
+    },
+    {
+      "id": "prefix-key-no-later",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.key_no_later_start",
+      "title": "Key body cannot recur at a later member prefix",
+      "kind": "theorem",
+      "label": "frontier:prefix-key-no-later",
+      "notes": "The next key phase lies at or beyond q, while any member quoting that q must precede q.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-canonical",
+        "prefix-before-index"
+      ],
+      "reviewed_shape_hash": 2126089053
+    },
+    {
+      "id": "prefix-key-history",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.key_history_unique",
+      "title": "Key charge index uniquely determines retained history",
+      "kind": "theorem",
+      "label": "frontier:prefix-key-history",
+      "notes": "The actual key-body q determines exact scratch history and saved-account state, even when comparing different member cursors.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-canonical",
+        "prefix-key-no-later"
+      ],
+      "reviewed_shape_hash": 3760348763
+    },
+    {
+      "id": "prefix-key-selected-cost",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selectedKeyCost_of_witness",
+      "title": "Selected key charge equals every actual witness",
+      "kind": "theorem",
+      "label": "frontier:prefix-key-selected-cost",
+      "notes": "Classical selection of the unique actual prefix yields its exact preciseCost; this does not bound the sum by the whole model allowance.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-key-history"
+      ],
+      "reviewed_shape_hash": 3395938652
+    },
+    {
+      "id": "prefix-selected-key-instance",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.selected_key_charges",
+      "title": "Selected exact key charge instantiates prefix key gas",
+      "kind": "theorem",
+      "label": "frontier:prefix-selected-key-instance",
+      "notes": "For each saved state, the unique retained history supplies KeyGasCharges for selectedKeyCost. The generic interface remains Open and total model funding remains missing.",
+      "required_type_dependencies": [
+        "prefix-key-gas"
+      ],
+      "required_proof_dependencies": [
+        "prefix-key-selected-cost"
+      ],
+      "reviewed_shape_hash": 227656
+    },
+    {
+      "id": "prefix-selected-key-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selected_key_refines_init",
+      "title": "Selected key charge reaches full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:prefix-selected-key-receipt",
+      "notes": "Instantiates both actual key hypotheses at selectedKeyCost. Full receipt observations remain Conditional on value/ignored gas and the unchanged whole-model budget; no generic key gas witness is assumed.",
+      "required_type_dependencies": [
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "prefix-receipt",
+        "prefix-selected-key-instance"
+      ],
+      "reviewed_shape_hash": 1668226916
     }
   ],
   "reviewed_environment": [
