@@ -2802,6 +2802,107 @@
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 1715380944,
       "indirect_admission": true
+    },
+    {
+      "id": "object-noesc-keys-before",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.keys_before",
+      "title": "Escape-free object keys before the value",
+      "kind": "theorem",
+      "label": "frontier:object-noesc-keys-before",
+      "notes": "Concrete cursor-independent empty-scratch instance. Key behavior and cost are proved; the numerical heap reserve is explicit.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3664282024,
+      "required_type_dependencies": [
+        "key-conditions",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "object-noesc-keys-saved",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.keys_saved",
+      "title": "Escape-free object keys retain the saved string",
+      "kind": "theorem",
+      "label": "frontier:object-noesc-keys-saved",
+      "notes": "Concrete instance after at most one allocation page, preserving the saved account and empty scratch. Its general heap reserve stays explicit.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1570945189,
+      "required_type_dependencies": [
+        "key-conditions",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "object-noesc-values",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.values",
+      "title": "Escape-free object account value bounds",
+      "kind": "theorem",
+      "label": "frontier:object-noesc-values",
+      "notes": "Instantiates the exact ValueConditions with an account of at most 64 decoded bytes, zero scratch growth, at most one allocation page and free-list bound max F0 1. The unchanged K169 cost is proved by allocator monotonicity.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 617256110,
+      "required_type_dependencies": [
+        "value-conditions",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "object-shallow-ignore",
+      "declaration": "WNear.Binary.SerdeIgnReuse.ignoreHyp",
+      "title": "Shallow ignored values preserve reusable state",
+      "kind": "theorem",
+      "label": "frontier:object-shallow-ignore",
+      "notes": "Existing concrete ignore-reader proof: shallow ignored values preserve both the scratch descriptor and a retained account String. This is an input-restricted IgnoreHyp instance, not a proof of the general obligation.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2725989424,
+      "required_type_dependencies": [
+        "ignore-hyp"
+      ]
+    },
+    {
+      "id": "object-noesc-initial-room",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.initial_room",
+      "title": "Initial memory supplies the object loop reserve",
+      "kind": "theorem",
+      "label": "frontier:object-noesc-initial-room",
+      "notes": "Derives the 132-page parser reserve after the input allocation from the actual 1024-page initial memory, 2048-page maximum and existing input bound below 2^24. This numerical instance does not construct linear method resources.",
+      "required_proof_dependencies": [
+        "input-allocation-pages"
+      ],
+      "reviewed_shape_hash": 2974199237,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "object-noesc-loop",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.f228_obj_noesc",
+      "title": "Object loop with concrete escape-free reader instances",
+      "kind": "theorem",
+      "label": "frontier:object-noesc-loop",
+      "notes": "The actual function-228 loop composes the concrete keys, account value and shallow ignore reader. No reader verification hypothesis is assumed. Conditional on the explicit HeapRoomK 132 reserve and required linear parser resources; not full method refinement.",
+      "required_proof_dependencies": [
+        "object-noesc-keys-before",
+        "object-noesc-keys-saved",
+        "object-noesc-values",
+        "object-shallow-ignore"
+      ],
+      "reviewed_shape_hash": 3327511809,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "object-noesc-loop-initial",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.f228_obj_initial_room",
+      "title": "Escape-free object loop at instantiated memory",
+      "kind": "theorem",
+      "label": "frontier:object-noesc-loop-initial",
+      "notes": "Kernel-checked actual function-228 loop with numerical room discharged from initial/input memory sizes, concrete key/value/ignore instances, exact owned String and restored frame. Requires the stated linear code, tables and parser resources. Integrated reader instances reach this loop; ownership construction and functions 78/66/65 into the method remain open.",
+      "required_proof_dependencies": [
+        "object-noesc-loop",
+        "object-noesc-initial-room"
+      ],
+      "reviewed_shape_hash": 713291232
     }
   ],
   "reviewed_environment": [

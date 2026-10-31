@@ -1,4 +1,5 @@
 import Architect
+import Bridge.Functions.SerdeObjectNoEsc
 import Architect.CollectUsed
 import Proofs.Refinement
 import Bridge.Functions.SerdeIgnClosing
@@ -1276,3 +1277,44 @@ attribute [blueprint "frontier:balance-outside-array-no-issue"
   (statement := /-- Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_absent_no_issue_obligation
+
+attribute [blueprint "frontier:object-noesc-keys-before"
+  (title := /-- Escape-free object keys before the value -/)
+  (statement := /-- Concrete cursor-independent empty-scratch instance. Key behavior and cost are proved; the numerical heap reserve is explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.keys_before
+
+attribute [blueprint "frontier:object-noesc-keys-saved"
+  (title := /-- Escape-free object keys retain the saved string -/)
+  (statement := /-- Concrete instance after at most one allocation page, preserving the saved account and empty scratch. Its general heap reserve stays explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.keys_saved
+
+attribute [blueprint "frontier:object-noesc-values"
+  (title := /-- Escape-free object account value bounds -/)
+  (statement := /-- Instantiates the exact ValueConditions with an account of at most 64 decoded bytes, zero scratch growth, at most one allocation page and free-list bound max F0 1. The unchanged K169 cost is proved by allocator monotonicity. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.values
+
+attribute [blueprint "frontier:object-shallow-ignore"
+  (title := /-- Shallow ignored values preserve reusable state -/)
+  (statement := /-- Existing concrete ignore-reader proof: shallow ignored values preserve both the scratch descriptor and a retained account String. This is an input-restricted IgnoreHyp instance, not a proof of the general obligation. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnReuse.ignoreHyp
+
+attribute [blueprint "frontier:object-noesc-initial-room"
+  (title := /-- Initial memory supplies the object loop reserve -/)
+  (statement := /-- Derives the 132-page parser reserve after the input allocation from the actual 1024-page initial memory, 2048-page maximum and existing input bound below 2^24. This numerical instance does not construct linear method resources. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.initial_room
+
+attribute [blueprint "frontier:object-noesc-loop"
+  (title := /-- Object loop with concrete escape-free reader instances -/)
+  (statement := /-- The actual function-228 loop composes the concrete keys, account value and shallow ignore reader. No reader verification hypothesis is assumed. Conditional on the explicit HeapRoomK 132 reserve and required linear parser resources; not full method refinement. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.f228_obj_noesc
+
+attribute [blueprint "frontier:object-noesc-loop-initial"
+  (title := /-- Escape-free object loop at instantiated memory -/)
+  (statement := /-- Kernel-checked actual function-228 loop with numerical room discharged from initial/input memory sizes, concrete key/value/ignore instances, exact owned String and restored frame. Requires the stated linear code, tables and parser resources. Integrated reader instances reach this loop; ownership construction and functions 78/66/65 into the method remain open. -/)]
+  WNear.Binary.SerdeObjectNoEsc.f228_obj_initial_room

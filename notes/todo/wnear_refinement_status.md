@@ -33,6 +33,40 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: concrete escape-free object-loop instances
+
+`SerdeObjectNoEsc.f228_obj_initial_room` proves the actual function-228 loop
+on escape-free object inputs whose ignored fields are accepted by `ign1R`.
+The concrete key and account-value bounds, and the existing shallow-ignore
+proof, are **Integrated** into this loop. Keys preserve empty scratch before
+and after the retained account allocation; the value allocates at most one
+page, preserves the exact account bytes and bounds the free list by `max F0 1`.
+The existing K646/K169 and ignored-reader charges are retained.
+
+`initial_room` derives the 132-page reserve from actual 1024/2048-page memory
+limits after either input-allocation outcome, for input below 2^24 bytes.
+The closed loop is **Proven**, using only the standard Lean axioms. The generic
+loop and the individual verification-condition instances remain visibly
+**Conditional** where their types contain named room or reader contracts.
+This does not discharge general `IgnoreHyp`, `KeyConditions` or
+`ValueConditions`: those remain **Open**, as do escaped object inputs and
+ignored values outside the shallow reader's domain.
+
+This is **not yet Integrated into the method receipt result**. The remaining
+work is to extract the object key/identifier static bytes and ignored-reader
+code from the actual initial store, carry the result through functions
+78/66/65, and fund that whole method path with the unchanged model gas bound.
+The completed array receipt case is unchanged. The exact outside-array
+accepted/safety leaves, rejected rollback, full balance method and global
+refinement retain their previous statuses and premises.
+
+No admission, allowlist scope or existing statement changes. The full strict
+audit and fresh actual-dependency/readiness check passed at 2026-10-31T03:06:15+00:00 for proof
+source `4f888d6f5fe5c66b662f5a1d3fa89fc65d6b23c9f36c2ffb8a8693fa71551212`. All previous statement pins are unchanged; additions are
+pinned. Frontier policy regressions, Lean style and toolchain checks passed.
+Publication requires the served revision and dependencies to match this evidence.
+
+
 ## Continuation on 2026-10-31: both valid array string paths reach receipt refinement
 
 `array_absent_refines_init` proves the full receipt result for initialized

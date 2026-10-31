@@ -60,6 +60,32 @@ class FrontierPolicyTests(unittest.TestCase):
         self.audit = {'violations': [{'declaration': n, 'axioms': ['sorryAx']}
                                      for n in self.manifest['expected_incomplete']]}
 
+    def test_object_instances_do_not_discharge_general_frontier(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['object-noesc-loop-initial']['status'], 'Proven')
+        for node in ['object-noesc-keys-before', 'object-noesc-keys-saved', 'object-noesc-values',
+                     'object-shallow-ignore', 'object-noesc-initial-room', 'object-noesc-loop']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+        for node in ['ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        self.assertIn({'id': 'object-noesc-loop-initial', 'status': 'Proven'},
+                      result['object-noesc-loop']['integrated_into'])
+        self.assertEqual(result['method-ft_balance_of']['status'], 'Conditional')
+        self.assertEqual(result['global']['status'], 'Conditional')
+        self.assertEqual(result['object-noesc-loop-initial']['integrated_into'], [])
+
+    def test_object_loop_cannot_lose_concrete_reader_composition(self):
+        self.by_id['object-noesc-loop']['proof_dependencies'].remove(
+            self.nodes['object-noesc-values']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_object_loop_cannot_lose_numerical_room_instantiation(self):
+        self.by_id['object-noesc-loop-initial']['proof_dependencies'].remove(
+            self.nodes['object-noesc-initial-room']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_broader_array_case_is_integrated_and_legacy_statements_specialize_it(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         self.assertEqual(result['balance-array-case-refinement']['status'], 'Proven')

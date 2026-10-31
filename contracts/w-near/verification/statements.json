@@ -285,6 +285,18 @@
     "WNear.Binary.SerdeStruct78Model.costArray",
     "WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_with_obligations",
     "WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_v86",
-    "WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase"
+    "WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase",
+    "WNear.Binary.SerdeObjectNoEsc.noesc_parts",
+    "WNear.Binary.SerdeObjectNoEsc.key_conditions",
+    "WNear.Binary.SerdeObjectNoEsc.before",
+    "WNear.Binary.SerdeObjectNoEsc.saved",
+    "WNear.Binary.SerdeObjectNoEsc.saved_room",
+    "WNear.Binary.SerdeObjectNoEsc.keys_before",
+    "WNear.Binary.SerdeObjectNoEsc.keys_saved",
+    "WNear.Binary.SerdeObjectNoEsc.values",
+    "WNear.Binary.SerdeObjectNoEsc.initial_room",
+    "WNear.Binary.SerdeObjectNoEsc.f228_obj_noesc",
+    "WNear.Binary.SerdeObjectNoEsc.f228_obj_initial_room",
+    "WNear.Binary.SerdeIgnReuse.ignoreHyp"
   ]
 }
