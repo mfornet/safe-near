@@ -33,6 +33,78 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: original model funding composed from an exact parser frontier
+
+The actual state-read/absent-lookup/return suffix now has additive kernel-checked
+bounds for retained parser output free bound up to 44. Earlier 32-bound results
+are unchanged. Given parser cost<=1 trillion+(2215+470*inputbytes)*regularOpCost,
+the actual input setup and suffix fit 1.2 trillion+397.5 million per input byte
+plus actual host charges under explicit CostsV86. Existing host, trie, data and
+loading results then establish the original ProviderModelBudget at deployed
+code size<=185625 and the unchanged 4 MiB receipt bound.
+
+SelectedParserLinearBudget states that exact remaining inequality for the same
+ledgerParserCost and concrete selected bundled key/account/ignored charges used
+by the full receipt. It is Open. linear_bundled_refines_init constructs actual
+storage premises from representation and absent registration, proves the
+original model budget from this named parser obligation, and composes the full
+selected-reader receipt result. It remains Conditional on the precise parser
+inequality and unchanged protocol/domain premises. The original broad
+ProviderModelBudget stays Open generically; its new constructor is scoped.
+
+This is checked top-level composition alongside the complete input/account
+bounds below. The next work is to sum actual charges and fund retained mixed
+growth within SelectedParserLinearBudget. Generic IgnoreHyp, KeyConditions,
+ValueConditions, remaining method/state/input cases and protocol obligations
+remain Open. No gas allowance, semantic observation, old statement or admission
+rule is weakened. Full deployed correctness still requires a sorryAx-free audit.
+
+## Continuation on 2026-10-31: complete input partition and account reserve
+
+The complete actual initial object-loop model now constructs a retained Prefix
+through the final brace, at most one account, exact inputWork equal to consumed
+input, and the existing mixed page bound. Each successful member partitions
+key body, value, whitespace and structural bytes exactly. The account-slot
+premise remains explicit for traces beginning from arbitrary saved states.
+
+The same unchanged bundled key charge has a borrowed 130-operation byte bound;
+successful copied keys consume at least an escape and closing quote. Composing
+those facts sharpens unknown-member regular work from the earlier 486 bound to
+470 operations per key/value consumed byte plus three structural bytes. Actual
+key growth remains separate. Old statements and raw allowances are unchanged.
+
+Actual pending-account Prefix models extended with the successful value string
+now instantiate F<=43 and segment growth<=21 from the single retained mixed
+history. The existing account scratch reserve is bounded by 400 billion gas,
+and the actual owned-copy allocation by 30 billion, under explicit reviewed
+Wasm cost ceilings (regular/unit<=822756, linear base<=26328192). Actual account
+syntax supplies decoded size<=64. The same valueCost and selectedValueCost used
+by the full receipt therefore fit (166+470*consumed) regular operations plus a
+500-billion-gas reserve. This is available for the one-account branch; it must
+be summed once, not once per member. Protocol cost ceilings remain explicit.
+
+These are Proven conditional arithmetic/model results under their displayed
+premises, without abstract verification obligations in their types. They are
+integrated through checked composition to the loop partition and selected
+account bound. They do not yet discharge ProviderModelBudget or upgrade any
+method/global status. The full receipt remains Conditional, and generic
+IgnoreHyp, KeyConditions, ValueConditions and gas contracts remain Open.
+
+Next: sum the selected actual charges over disjoint input, account for retained
+mixed key/frame growth with sufficient structural slack, and compose unchanged
+wrapper/host/loading costs with the original 4e12 fixed and 400-million-per-byte
+model budget. The current 470 ignored-byte allowance plus separate frame growth
+may require a sharper actual regular-work proof. This is a proof allowance
+frontier, not a deployed-binary counterexample. No environment, observation,
+budget, admission frontier or old statement is weakened.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T13:53:34+00:00 for proof source `0466e99a5e9816b8d34d3a1a74730e798aeb87587d0522bade22399c61cfeffb`. All 103 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical, including original parser and loop contracts. The
+exact admission frontier and original gas/observation/domain statements are
+unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: selected readers and actual field costs reach the receipt
 
 The actual f755/f754/f194 key-length mismatch path is now checked at 30/50/80

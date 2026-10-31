@@ -7707,6 +7707,267 @@
       "required_type_dependencies": [],
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 1414201458
+    },
+    {
+      "id": "trace-prefix-end",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.CallTrace.prefix_end",
+      "title": "Complete actual trace extends the retained prefix",
+      "kind": "theorem",
+      "label": "frontier:trace-prefix-end",
+      "notes": "Every successful member trace extends its actual pending prefix through the final brace. The precise remaining account-slot premise prevents duplicates.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 598019239
+    },
+    {
+      "id": "member-input-partition",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.member_consumed_exact",
+      "title": "Actual member slices exactly partition consumed input",
+      "kind": "theorem",
+      "label": "frontier:member-input-partition",
+      "notes": "Key body, value, both whitespace regions and punctuation are disjoint and cover exactly the successful member input.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1279588439
+    },
+    {
+      "id": "trace-value-end",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ValueSegment.end_eq",
+      "title": "Value endpoint agrees with its actual reader",
+      "kind": "theorem",
+      "label": "frontier:trace-value-end",
+      "notes": "Successful account and ignored-segment witnesses agree with the pure endpoint used for input accounting.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3581472425
+    },
+    {
+      "id": "trace-input-partition",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.CallTrace.input_work",
+      "title": "Complete call trace has exact consumed-byte work",
+      "kind": "theorem",
+      "label": "frontier:trace-input-partition",
+      "notes": "The recursively followed actual key/value endpoints partition the full consumed input, including closing whitespace and brace.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "member-input-partition",
+        "trace-value-end"
+      ],
+      "reviewed_shape_hash": 360977585
+    },
+    {
+      "id": "loop-prefix-input",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.loop_prefix_input",
+      "title": "Actual initial loop supplies prefix and exact input partition",
+      "kind": "theorem",
+      "label": "frontier:loop-prefix-input",
+      "notes": "Successful initial object-loop models construct complete retained prefixes, at most one account, exact byte coverage and the existing total page bound.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "trace-prefix-end",
+        "trace-input-partition",
+        "mixed-loop-pages"
+      ],
+      "reviewed_shape_hash": 865024149
+    },
+    {
+      "id": "copied-key-minimum",
+      "declaration": "WNear.Binary.SerdeKeyReuse.copied_consumed",
+      "title": "Copied keys consume an escape and final quote",
+      "kind": "theorem",
+      "label": "frontier:copied-key-minimum",
+      "notes": "Every successful nonborrowed string consumes at least three source bytes, proved through the actual escape decoder and recursive string progress.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "string-work-tight"
+      ],
+      "reviewed_shape_hash": 2056665703
+    },
+    {
+      "id": "bundled-borrowed-work",
+      "declaration": "WNear.Binary.SerdeKeyReuse.bundledCost_borrowed_tight",
+      "title": "Borrowed bundled work retains its 130-operation byte rate",
+      "kind": "theorem",
+      "label": "frontier:bundled-borrowed-work",
+      "notes": "The same selected raw key allowance and actual classification cost fit their fast-path bound without growth.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3906850222
+    },
+    {
+      "id": "ignored-member-work-470",
+      "declaration": "WNear.Binary.SerdeKeyReuse.ignored_member_regular_budget_470",
+      "title": "Unknown-member regular work fits 470 operations per byte",
+      "kind": "theorem",
+      "label": "frontier:ignored-member-work-470",
+      "notes": "Borrowed fast work and the minimum copied-key size sharpen the complete key/classification/loop/ignored regular bound. Actual retained growth stays separate; whole-method funding remains Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "copied-key-minimum",
+        "bundled-borrowed-work",
+        "bundled-key-work"
+      ],
+      "reviewed_shape_hash": 3507610144
+    },
+    {
+      "id": "account-growth-budget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.account_growth_budget_le",
+      "title": "Account scratch reserve has a concrete scalar bound",
+      "kind": "theorem",
+      "label": "frontier:account-growth-budget",
+      "notes": "The existing growthBudget is at most 400 billion gas under explicit F<=43, G<=21, decoded bytes<=64 and reviewed Wasm cost bounds. These premises are instantiated from actual prefixes below.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3809954710
+    },
+    {
+      "id": "account-copy-budget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.account_owned_copy_budget_le",
+      "title": "Account owned allocation has a concrete scalar bound",
+      "kind": "theorem",
+      "label": "frontier:account-copy-budget",
+      "notes": "The actual cost618 is at most 30 billion gas under explicit F<=85, decoded bytes<=64 and reviewed Wasm cost bounds.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3168472292
+    },
+    {
+      "id": "mixed-growth-append",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.mixed_growth_append",
+      "title": "Mixed growth count composes along retained capacities",
+      "kind": "theorem",
+      "label": "frontier:mixed-growth-append",
+      "notes": "Appending histories preserves the exact evolving capacity; no per-member reset is introduced.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2760225467
+    },
+    {
+      "id": "prefix-account-resources",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.account_resources",
+      "title": "Actual pending account supplies allocator bounds",
+      "kind": "theorem",
+      "label": "frontier:prefix-account-resources",
+      "notes": "Prefix models extended with the actual successful account string derive F<=43 and its segment G<=21 from the single mixed history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-models",
+        "mixed-growth-append",
+        "mixed-batches-model-bounds",
+        "mixed-growth-v86"
+      ],
+      "reviewed_shape_hash": 3708289313
+    },
+    {
+      "id": "account-value-charge-bound",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.account_value_charge_le",
+      "title": "Actual account charge fits byte work plus one fixed reserve",
+      "kind": "theorem",
+      "label": "frontier:account-value-charge-bound",
+      "notes": "The unchanged borrowed/copied valueCost fits (166+470*consumed) operations plus 500 billion gas. Successful parse/UTF8, allocator and reviewed Wasm cost premises remain explicit.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "account-growth-budget",
+        "account-copy-budget",
+        "string-work-tight"
+      ],
+      "reviewed_shape_hash": 432427338
+    },
+    {
+      "id": "prefix-account-value-bound",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.account_value_charge",
+      "title": "Actual prefix instantiates account allocator budget",
+      "kind": "theorem",
+      "label": "frontier:prefix-account-value-bound",
+      "notes": "Actual pending account and successful model supply decoded size and allocator bounds; only the explicit reviewed Wasm cost ceilings remain.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-account-resources",
+        "account-value-charge-bound"
+      ],
+      "reviewed_shape_hash": 667580200
+    },
+    {
+      "id": "selected-account-value-bound",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selectedValueCost_account_bound",
+      "title": "Receipt-selected account charge has the concrete bound",
+      "kind": "theorem",
+      "label": "frontier:selected-account-value-bound",
+      "notes": "The exact selectedValueCost used by fully_bundled_refines_init agrees with any actual value witness and fits byte work plus 500 billion gas. Whole-method summation and protocol instantiation remain unresolved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "selected-value-cost",
+        "prefix-account-value-bound"
+      ],
+      "reviewed_shape_hash": 2474362449
+    },
+    {
+      "id": "provider-suffix-44",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.suffix64_cost_le",
+      "title": "Actual suffix is funded after retained parser allocation",
+      "kind": "theorem",
+      "label": "frontier:provider-suffix-44",
+      "notes": "Additive cost bounds support output free bound up to 44 using the same actual state read, absent lookup and return suffix. All previous 32-bound statements remain unchanged.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3099994016
+    },
+    {
+      "id": "provider-body-linear",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_body_linear_cost",
+      "title": "Parser linear allowance funds actual provider body",
+      "kind": "theorem",
+      "label": "frontier:provider-body-linear",
+      "notes": "Input setup and exact suffix composition yield fixed 1.2 trillion plus 397.5 million per byte and actual host charges. Parser allowance, reviewed protocol costs and F<=44 remain explicit.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "provider-suffix-44"
+      ],
+      "reviewed_shape_hash": 708281210
+    },
+    {
+      "id": "provider-budget-from-linear",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.provider_model_budget_of_parser_linear",
+      "title": "Loading and host composition establish original model budget",
+      "kind": "theorem",
+      "label": "frontier:provider-budget-from-linear",
+      "notes": "From parser<=1 trillion+(2215+470*inputbytes)*regularOpCost, CostsV86, deployed size bound and actual storage premises, checked loading/input/suffix/host/trie composition proves unchanged ProviderModelBudget. No model gas or observation is changed.",
+      "required_type_dependencies": [
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "provider-body-linear",
+        "object-host-gas",
+        "balance-trie-cost-bound"
+      ],
+      "reviewed_shape_hash": 1812351714
+    },
+    {
+      "id": "selected-parser-linear-budget",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.SelectedParserLinearBudget",
+      "title": "Exact remaining selected parser inequality",
+      "kind": "verification_contract",
+      "label": "frontier:selected-parser-linear-budget",
+      "notes": "For the same concrete bundled key/account/ignored charges used by the receipt, ledgerParserCost must fit 1 trillion+(2215+470*inputbytes)*regularOpCost. Complete trace summation, retained growth funding and account reserve composition remain unresolved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 18431242957826806215
+    },
+    {
+      "id": "linear-bundled-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.linear_bundled_refines_init",
+      "title": "Parser linear obligation reaches full original-budget receipt",
+      "kind": "theorem",
+      "label": "frontier:linear-bundled-receipt",
+      "notes": "Actual representation and absent-account storage instantiate host premises. Checked linear funding constructs ProviderModelBudget and feeds the full selected-reader receipt. Exact parser inequality and unchanged protocol/domain premises remain unresolved.",
+      "required_type_dependencies": [
+        "selected-parser-linear-budget"
+      ],
+      "required_proof_dependencies": [
+        "provider-budget-from-linear",
+        "fully-bundled-receipt"
+      ],
+      "reviewed_shape_hash": 2202897778
     }
   ],
   "reviewed_environment": [

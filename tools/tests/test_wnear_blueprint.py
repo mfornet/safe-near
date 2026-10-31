@@ -577,6 +577,51 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_complete_input_and_account_bounds_preserve_funding_frontier(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['trace-prefix-end', 'member-input-partition', 'trace-value-end',
+                     'trace-input-partition', 'loop-prefix-input', 'copied-key-minimum',
+                     'bundled-borrowed-work', 'ignored-member-work-470', 'account-growth-budget',
+                     'account-copy-budget', 'mixed-growth-append', 'prefix-account-resources',
+                     'account-value-charge-bound', 'prefix-account-value-bound', 'selected-account-value-bound']:
+            self.assertEqual(result[node]['status'], 'Proven')
+            self.assertFalse(result[node]['direct_sorry'])
+        self.assertEqual(result['fully-bundled-receipt']['status'], 'Conditional')
+        for node in ['provider-model-budget', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        self.assertIn({'id': 'prefix-account-value-bound', 'status': 'Proven'},
+                      result['prefix-account-resources']['integrated_into'])
+        self.assertIn({'id': 'selected-account-value-bound', 'status': 'Proven'},
+                      result['prefix-account-value-bound']['integrated_into'])
+
+    def test_complete_loop_partition_cannot_skip_actual_trace(self):
+        self.by_id['loop-prefix-input']['proof_dependencies'].remove(self.nodes['trace-prefix-end']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_account_charge_cannot_skip_retained_history_bound(self):
+        self.by_id['prefix-account-value-bound']['proof_dependencies'].remove(self.nodes['prefix-account-resources']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_parser_linear_frontier_cannot_claim_full_model_funding(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['selected-parser-linear-budget']['status'], 'Open')
+        self.assertEqual(result['provider-model-budget']['status'], 'Open')
+        self.assertEqual(result['provider-suffix-44']['status'], 'Proven')
+        self.assertEqual(result['provider-body-linear']['status'], 'Proven')
+        self.assertEqual(result['provider-budget-from-linear']['status'], 'Conditional')
+        self.assertEqual(result['linear-bundled-receipt']['status'], 'Conditional')
+        self.assertIn('selected-parser-linear-budget', result['linear-bundled-receipt']['type_edges'])
+        self.assertNotIn('provider-model-budget', result['linear-bundled-receipt']['type_edges'])
+        self.assertIn({'id': 'linear-bundled-receipt', 'status': 'Conditional'},
+                      result['provider-budget-from-linear']['integrated_into'])
+
+    def test_linear_receipt_cannot_skip_original_model_budget_construction(self):
+        self.by_id['linear-bundled-receipt']['proof_dependencies'].remove(self.nodes['provider-budget-from-linear']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

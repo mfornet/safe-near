@@ -1,3 +1,7 @@
+import Bridge.Methods.FtBalanceOfProviderLinearGas
+import Bridge.Functions.SerdeMixedPrefix
+import Bridge.Functions.SerdeBundledRate
+import Bridge.Functions.SerdeAccountBudget
 import Bridge.Functions.SerdeBundledSelected
 import Bridge.Functions.SerdeBundledWork
 import Bridge.Functions.SerdePrefixSelectedKey
@@ -3197,3 +3201,106 @@ attribute [blueprint "frontier:regular-byte-rate"
   (title := /-- Reviewed operation bound funds the byte rate -/)
   (statement := /-- 486 regular operations fit the unchanged 400-million-gas argument-byte coefficient under the explicit reviewed op bound 822756. This does not instantiate pinned protocol costs or fund actual growth. -/)]
   WNear.Binary.SerdeKeyReuse.regular_byte_rate
+
+attribute [blueprint "frontier:trace-prefix-end"
+  (title := /-- Complete actual trace extends the retained prefix -/)
+  (statement := /-- Every successful member trace extends its actual pending prefix through the final brace. The precise remaining account-slot premise prevents duplicates. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace.prefix_end
+
+attribute [blueprint "frontier:member-input-partition"
+  (title := /-- Actual member slices exactly partition consumed input -/)
+  (statement := /-- Key body, value, both whitespace regions and punctuation are disjoint and cover exactly the successful member input. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.member_consumed_exact
+
+attribute [blueprint "frontier:trace-value-end"
+  (title := /-- Value endpoint agrees with its actual reader -/)
+  (statement := /-- Successful account and ignored-segment witnesses agree with the pure endpoint used for input accounting. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment.end_eq
+
+attribute [blueprint "frontier:trace-input-partition"
+  (title := /-- Complete call trace has exact consumed-byte work -/)
+  (statement := /-- The recursively followed actual key/value endpoints partition the full consumed input, including closing whitespace and brace. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace.input_work
+
+attribute [blueprint "frontier:loop-prefix-input"
+  (title := /-- Actual initial loop supplies prefix and exact input partition -/)
+  (statement := /-- Successful initial object-loop models construct complete retained prefixes, at most one account, exact byte coverage and the existing total page bound. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.loop_prefix_input
+
+attribute [blueprint "frontier:copied-key-minimum"
+  (title := /-- Copied keys consume an escape and final quote -/)
+  (statement := /-- Every successful nonborrowed string consumes at least three source bytes, proved through the actual escape decoder and recursive string progress. -/)]
+  WNear.Binary.SerdeKeyReuse.copied_consumed
+
+attribute [blueprint "frontier:bundled-borrowed-work"
+  (title := /-- Borrowed bundled work retains its 130-operation byte rate -/)
+  (statement := /-- The same selected raw key allowance and actual classification cost fit their fast-path bound without growth. -/)]
+  WNear.Binary.SerdeKeyReuse.bundledCost_borrowed_tight
+
+attribute [blueprint "frontier:ignored-member-work-470"
+  (title := /-- Unknown-member regular work fits 470 operations per byte -/)
+  (statement := /-- Borrowed fast work and the minimum copied-key size sharpen the complete key/classification/loop/ignored regular bound. Actual retained growth stays separate; whole-method funding remains Open. -/)]
+  WNear.Binary.SerdeKeyReuse.ignored_member_regular_budget_470
+
+attribute [blueprint "frontier:account-growth-budget"
+  (title := /-- Account scratch reserve has a concrete scalar bound -/)
+  (statement := /-- The existing growthBudget is at most 400 billion gas under explicit F<=43, G<=21, decoded bytes<=64 and reviewed Wasm cost bounds. These premises are instantiated from actual prefixes below. -/)]
+  WNear.Binary.SerdeObjectPrefix.account_growth_budget_le
+
+attribute [blueprint "frontier:account-copy-budget"
+  (title := /-- Account owned allocation has a concrete scalar bound -/)
+  (statement := /-- The actual cost618 is at most 30 billion gas under explicit F<=85, decoded bytes<=64 and reviewed Wasm cost bounds. -/)]
+  WNear.Binary.SerdeObjectPrefix.account_owned_copy_budget_le
+
+attribute [blueprint "frontier:mixed-growth-append"
+  (title := /-- Mixed growth count composes along retained capacities -/)
+  (statement := /-- Appending histories preserves the exact evolving capacity; no per-member reset is introduced. -/)]
+  WNear.Binary.SerdeObjectPrefix.mixed_growth_append
+
+attribute [blueprint "frontier:prefix-account-resources"
+  (title := /-- Actual pending account supplies allocator bounds -/)
+  (statement := /-- Prefix models extended with the actual successful account string derive F<=43 and its segment G<=21 from the single mixed history. -/)]
+  WNear.Binary.SerdeObjectPrefix.Bound.account_resources
+
+attribute [blueprint "frontier:account-value-charge-bound"
+  (title := /-- Actual account charge fits byte work plus one fixed reserve -/)
+  (statement := /-- The unchanged borrowed/copied valueCost fits (166+470*consumed) operations plus 500 billion gas. Successful parse/UTF8, allocator and reviewed Wasm cost premises remain explicit. -/)]
+  WNear.Binary.SerdeObjectPrefix.account_value_charge_le
+
+attribute [blueprint "frontier:prefix-account-value-bound"
+  (title := /-- Actual prefix instantiates account allocator budget -/)
+  (statement := /-- Actual pending account and successful model supply decoded size and allocator bounds; only the explicit reviewed Wasm cost ceilings remain. -/)]
+  WNear.Binary.SerdeObjectPrefix.Bound.account_value_charge
+
+attribute [blueprint "frontier:selected-account-value-bound"
+  (title := /-- Receipt-selected account charge has the concrete bound -/)
+  (statement := /-- The exact selectedValueCost used by fully_bundled_refines_init agrees with any actual value witness and fits byte work plus 500 billion gas. Whole-method summation and protocol instantiation remain unresolved. -/)]
+  WNear.Binary.SerdeObjectPrefix.selectedValueCost_account_bound
+
+attribute [blueprint "frontier:provider-suffix-44"
+  (title := /-- Actual suffix is funded after retained parser allocation -/)
+  (statement := /-- Additive cost bounds support output free bound up to 44 using the same actual state read, absent lookup and return suffix. All previous 32-bound statements remain unchanged. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.suffix64_cost_le
+
+attribute [blueprint "frontier:provider-body-linear"
+  (title := /-- Parser linear allowance funds actual provider body -/)
+  (statement := /-- Input setup and exact suffix composition yield fixed 1.2 trillion plus 397.5 million per byte and actual host charges. Parser allowance, reviewed protocol costs and F<=44 remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_body_linear_cost
+
+attribute [blueprint "frontier:provider-budget-from-linear"
+  (title := /-- Loading and host composition establish original model budget -/)
+  (statement := /-- From parser<=1 trillion+(2215+470*inputbytes)*regularOpCost, CostsV86, deployed size bound and actual storage premises, checked loading/input/suffix/host/trie composition proves unchanged ProviderModelBudget. No model gas or observation is changed. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.provider_model_budget_of_parser_linear
+
+attribute [blueprint "frontier:selected-parser-linear-budget"
+  (title := /-- Exact remaining selected parser inequality -/)
+  (statement := /-- For the same concrete bundled key/account/ignored charges used by the receipt, ledgerParserCost must fit 1 trillion+(2215+470*inputbytes)*regularOpCost. Complete trace summation, retained growth funding and account reserve composition remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.SelectedParserLinearBudget
+
+attribute [blueprint "frontier:linear-bundled-receipt"
+  (title := /-- Parser linear obligation reaches full original-budget receipt -/)
+  (statement := /-- Actual representation and absent-account storage instantiate host premises. Checked linear funding constructs ProviderModelBudget and feeds the full selected-reader receipt. Exact parser inequality and unchanged protocol/domain premises remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.linear_bundled_refines_init
