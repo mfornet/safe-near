@@ -18113,6 +18113,200 @@ def WNear.Binary.SerdeStructObjValueState.ValueConditions (cfg : Wasm.Near.WasmC
                                             (List.drop (j + 1) bs) [])).1
 ```
 
+## Bridge.Functions.SerdeTraceCost
+
+`WNear.Binary.SerdeObjectMixedTrace.CallTrace.objCost_eq` (hash `000000000c8d0195`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.CallTrace.objCost_eq {bs : List UInt8} {i stop accounts : ℕ} {first : Bool}
+  {keys : List WNear.Binary.SerdeKeyEsc.KeySample} {batches : WNear.Binary.ScratchMixedTrace.Batches}
+  (ht : WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches stop accounts) (c : ℕ)
+  (Kkey Kvalue Kignore : ℕ → ℕ) (N : ℕ) (hN : keys.length ≤ N) :
+  WNear.Binary.SerdeStructObj.objCost c Kkey Kvalue Kignore (WNear.SerdeStructModel.valueAs WNear.account)
+      WNear.Binary.SerdeIgnObject.ignored bs N first i =
+    WNear.Binary.SerdeObjectMixedTrace.traceCost c Kkey Kvalue Kignore bs i first keys
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_cost_le` (hash `00000000d0f7a77c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_cost_le {bs : List UInt8} {start i stop accounts : ℕ}
+  {first saved : Bool} {keys : List WNear.Binary.SerdeKeyEsc.KeySample}
+  {batches pre : WNear.Binary.ScratchMixedTrace.Batches}
+  (ht : WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches stop accounts) (cfg : Wasm.Near.WasmConfig)
+  (hlen : bs.length ≤ 4194304)
+  (hp :
+    WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first) i pre saved)
+  (hslots : (accounts + if saved = true then 1 else 0) ≤ 1) (hop : cfg.regularOpCost ≤ 822756)
+  (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  WNear.Binary.SerdeObjectMixedTrace.traceCost cfg.regularOpCost
+      (WNear.Binary.SerdeObjectPrefix.selectedBundledKeyCost cfg bs start 1)
+      (WNear.Binary.SerdeObjectPrefix.selectedValueCost cfg bs start 1)
+      (WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost cfg bs start 1) bs i first keys ≤
+    470 * (stop - i + if first = true then 1 else 0) * cfg.regularOpCost + 500000000000 * accounts +
+      WNear.Binary.ScratchMixedTrace.extraCost cfg (WNear.Binary.ScratchMixedTrace.endFreeBound 1 0 pre)
+        (WNear.Binary.ScratchMixedTrace.endCap 0 pre) batches
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_charge` (hash `00000000c195aab9`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_charge {bs : List UInt8} {start i e : ℕ} {key : String}
+  {pre : WNear.Binary.ScratchMixedTrace.Batches} {saved : Bool} {seg : WNear.Binary.ScratchMixedTrace.Segment}
+  (cfg : Wasm.Near.WasmConfig) (hlen : bs.length ≤ 4194304)
+  (hp : WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.value key) i pre saved)
+  (hdup : key = "account_id" → saved = false)
+  (hcolon : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58)
+  (he : i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1 ≤ e) (heb : e ≤ bs.length)
+  (hv :
+    WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key
+      (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) e seg)
+  (hop : cfg.regularOpCost ≤ 822756) (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  (if key = "account_id" then
+      WNear.Binary.SerdeObjectPrefix.selectedValueCost cfg bs start 1
+        (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+    else
+      WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost cfg bs start 1
+        (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)) ≤
+    ((166 + 470 * (e - (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1))) * cfg.regularOpCost +
+        if key = "account_id" then 500000000000 else 0) +
+      WNear.Binary.ScratchMixedTrace.Segment.extraCost cfg (WNear.Binary.ScratchMixedTrace.endFreeBound 1 0 pre)
+        (WNear.Binary.ScratchMixedTrace.endCap 0 pre) seg
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.keyQ_not_brace` (hash `0000000033069aca`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.keyQ_not_brace {bs : List UInt8} {i q : ℕ} {first : Bool}
+  (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q) :
+  bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? ≠ some 125
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.loop_keys_fuel_account` (hash `00000000dc2c062c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.loop_keys_fuel_account (bs : List UInt8) (N : ℕ) (first : Bool) (i : ℕ)
+  (seen : Option WNear.AccountId) (a : WNear.AccountId) (rest : List UInt8) (hi : i ≤ bs.length)
+  (hloop :
+    WNear.SerdeStructLoop.loopRes "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N first seen (List.drop i bs) =
+      some (some a, rest)) :
+  ∃ keys,
+    WNear.Binary.SerdeObjectCoverage.KeyWalk bs i first keys (bs.length - rest.length) ∧
+      keys.length ≤ N ∧ (WNear.Binary.SerdeObjectMixedTrace.accountCount keys + if seen.isSome = true then 1 else 0) ≤ 1
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.loop_selected_cost_le` (hash `0000000086c3ad30`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.loop_selected_cost_le (cfg : Wasm.Near.WasmConfig) (bs : List UInt8) (N i : ℕ)
+  (a : WNear.AccountId) (rest : List UInt8) (hlen : bs.length ≤ 4194304) (hi : i ≤ bs.length)
+  (hloop :
+    WNear.SerdeStructLoop.loopRes "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N true none (List.drop i bs) =
+      some (some a, rest))
+  (hop : cfg.regularOpCost ≤ 822756) (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  ∃ batches accounts keys,
+    WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i true keys batches (bs.length - rest.length) accounts ∧
+      accounts ≤ 1 ∧
+        WNear.Binary.SerdeStructObj.objCost cfg.regularOpCost
+            (WNear.Binary.SerdeObjectPrefix.selectedBundledKeyCost cfg bs i 1)
+            (WNear.Binary.SerdeObjectPrefix.selectedValueCost cfg bs i 1)
+            (WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost cfg bs i 1)
+            (WNear.SerdeStructModel.valueAs WNear.account) WNear.Binary.SerdeIgnObject.ignored bs N true i ≤
+          470 * (bs.length - rest.length - i + 1) * cfg.regularOpCost + 500000000000 +
+            WNear.Binary.ScratchMixedTrace.extraCost cfg 1 0 batches
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.member_selected_charge` (hash `00000000cfd64d16`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.member_selected_charge {bs : List UInt8} {start i q e : ℕ} {first saved : Bool}
+  {key : String} {r1 r2 : List UInt8} {pre : WNear.Binary.ScratchMixedTrace.Batches}
+  {seg : WNear.Binary.ScratchMixedTrace.Segment} (cfg : Wasm.Near.WasmConfig) (hlen : bs.length ≤ 4194304)
+  (hp :
+    WNear.Binary.SerdeObjectPrefix.Prefix bs start (WNear.Binary.SerdeStructObjPhase.Phase.member first) i pre saved)
+  (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q)
+  (hs : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, r1))
+  (hc : WNear.JsonFuel.colonAt r1 = some r2) (he : bs.length - r2.length ≤ e) (heb : e ≤ bs.length)
+  (hv : WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key r2 e seg) (hdup : key = "account_id" → saved = false)
+  (hop : cfg.regularOpCost ≤ 822756) (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  ((942 +
+              96 *
+                (WNear.Binary.SerdeNextKey.keyWs first bs i +
+                  WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - r1.length) bs)) +
+            WNear.Binary.SerdeKey.cost194) *
+          cfg.regularOpCost +
+        WNear.Binary.SerdeObjectPrefix.selectedBundledKeyCost cfg bs start 1 q +
+      if key = "account_id" then
+        WNear.Binary.SerdeObjectPrefix.selectedValueCost cfg bs start 1
+          (bs.length - r1.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - r1.length) bs) + 1)
+      else
+        WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost cfg bs start 1
+          (bs.length - r1.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - r1.length) bs) + 1)) ≤
+    (470 * (e - i + if first = true then 1 else 0) * cfg.regularOpCost +
+        if key = "account_id" then 500000000000 else 0) +
+      WNear.Binary.ScratchMixedTrace.extraCost cfg (WNear.Binary.ScratchMixedTrace.endFreeBound 1 0 pre)
+        (WNear.Binary.ScratchMixedTrace.endCap 0 pre)
+        [WNear.Binary.ScratchMixedTrace.Segment.append (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) []),
+          seg]
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.mixed_growth_small_budget` (hash `00000000fd8cc55a`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.mixed_growth_small_budget (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (batches : WNear.Binary.ScratchMixedTrace.Batches) (hlen : bs.length ≤ 10000)
+  (hm : ∀ seg ∈ batches, WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg) (hop : cfg.regularOpCost ≤ 822756)
+  (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  WNear.Binary.ScratchMixedTrace.extraCost cfg 1 0 batches ≤ 500000000000
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.selected_parser_cost_le` (hash `000000006f6b7c06`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.selected_parser_cost_le (cfg : Wasm.Near.WasmConfig) (bs : List UInt8) (N : ℕ)
+  (a : WNear.AccountId) (rest : List UInt8) (hlen : bs.length ≤ 4194304)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hop : cfg.regularOpCost ≤ 822756) (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  ∃ batches,
+    (∀ seg ∈ batches, WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg) ∧
+      WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost cfg
+          (WNear.Binary.SerdeObjectPrefix.selectedBundledKeyCost cfg bs (WNear.Binary.SerdeRead.wsLen bs + 1) 1)
+          (WNear.Binary.SerdeObjectPrefix.selectedValueCost cfg bs (WNear.Binary.SerdeRead.wsLen bs + 1) 1)
+          (WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost cfg bs (WNear.Binary.SerdeRead.wsLen bs + 1) 1) bs rest N ≤
+        (2215 + 470 * bs.length) * cfg.regularOpCost + 500000000000 +
+          WNear.Binary.ScratchMixedTrace.extraCost cfg 1 0 batches
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.selected_parser_linear_small` (hash `00000000c2db6228`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.selected_parser_linear_small (cfg : Wasm.Near.WasmConfig) (bs : List UInt8) (N : ℕ)
+  (a : WNear.AccountId) (rest : List UInt8) (hlen : bs.length ≤ 10000)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hop : cfg.regularOpCost ≤ 822756) (hbase : cfg.linearOpBaseCost ≤ 26328192) (hunit : cfg.linearOpUnitCost ≤ 822756) :
+  WNear.Binary.SerdeObjectPrefix.SelectedParserLinearBudget cfg bs rest N
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.traceCost` (hash `eabd85762f57b7a6`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.traceCost (c : ℕ) (Kkey Kvalue Kignore : ℕ → ℕ) (bs : List UInt8) :
+  ℕ → Bool → List WNear.Binary.SerdeKeyEsc.KeySample → ℕ :=
+  fun x x_1 x_2 =>
+    List.brecOn (motive := fun x => ℕ → Bool → ℕ) x_2
+      (WNear.Binary.SerdeObjectMixedTrace.traceCost._f c Kkey Kvalue Kignore bs) x x_1
+```
+
 ## Bridge.Functions.SerdeValueReuse
 
 `WNear.Binary.SerdeValueReuse.spec169_model` (hash `00000000e29224d0`)
@@ -21990,6 +22184,120 @@ theorem WNear.Binary.BalanceOf297AbsentCall.provider_body_cost_erase (cfg : Wasm
     WNear.Binary.BalanceOf297AbsentCall.providerBodyCost cfg e (NearLogic.inputHost e 0) S a parseGas outF
 ```
 
+## Bridge.Methods.FtBalanceOfSmallGeneralObject
+
+`WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase` (hash `67215d43272b0b29`)
+
+```lean
+def WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase (st : Option WNear.State) (ctx : NearInterface.Context)
+  (c : WNear.Call) : Prop :=
+  ∃ S a bs rest N,
+    st = some S ∧
+      c = WNear.Call.ftBalanceOf a ∧
+        a ∉ S.registered ∧
+          ctx.args = bs ∧
+            bs.length ≤ 10000 ∧
+              bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123 ∧
+                WNear.SerdeStructModel.objLoop "account_id"
+                      (WNear.SerdeStructModel.valueAs WNear.account)
+                      WNear.Binary.SerdeIgnObject.ignored N none
+                      (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+                    some (some a, rest) ∧
+                  bs.length - rest.length +
+                      WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) =
+                    bs.length
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_accepted` (hash `000000008453486e`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_accepted (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (he : WNear.Binary.Exported.Environment protocol) (hsize : size ≤ 185625) (raw : WNear.RawStorage)
+  (st : Option WNear.State) (ctx : NearInterface.Context) (c : WNear.Call) (hrep : (WNear.wnear cfg).Represents raw st)
+  (hwf : ctx.WF raw) (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hcase : WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase st ctx c) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx st c;
+  ((WNear.wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st c) →
+        NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st c) ∧
+    (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+      NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_no_issue` (hash `00000000530bf00d`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_no_issue (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (he : WNear.Binary.Exported.Environment protocol) (hsize : size ≤ 185625) (raw : WNear.RawStorage)
+  (st : Option WNear.State) (ctx : NearInterface.Context) (c : WNear.Call) (hrep : (WNear.wnear cfg).Represents raw st)
+  (hwf : ctx.WF raw) (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hcase : WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase st ctx c) (msg : String) :
+  (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx).outcome ≠
+    Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.small_general_parser_cost` (hash `0000000091feb21a`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.small_general_parser_cost (cfg : WNear.Config) (size : ℕ) (raw : WNear.RawStorage)
+  (ctx : NearInterface.Context) (S : WNear.State) (a : WNear.AccountId)
+  (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 ctx.protocol) (hsize : size ≤ 185625)
+  (hrep : (WNear.wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw)
+  (hcase : WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase (some S) ctx (WNear.Call.ftBalanceOf a)) :
+  ∃ parseGas outF,
+    WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
+      WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg size raw (some S) ctx S a parseGas outF
+```
+
+`WNear.Binary.SerdeObjectPrefix.small_bundled_plan` (hash `00000000c882768a`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.small_bundled_plan (cfg : WNear.Config) (ctx : NearInterface.Context)
+  (raw : WNear.RawStorage) (modelSt : Option WNear.State) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8)
+  (N size : ℕ) (hcosts : WNear.Binary.FtTotalSupplyMethod.CostsV86 ctx.protocol) (hsize : size ≤ 185625)
+  (hargs : ctx.args = bs) (hlen : bs.length ≤ 10000) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length)
+  (hv : (NearLogic.erase (WNear.Binary.hostOf ctx raw)).storage WNear.stateKey = some (WNear.header S))
+  (hnone :
+    (NearLogic.erase (WNear.Binary.hostOf ctx raw)).storage
+        (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none) :
+  WNear.Binary.BalanceOf297AbsentCall.AbsentParserPlan cfg size raw modelSt ctx S a bs
+```
+
+`WNear.Binary.SerdeObjectPrefix.small_bundled_refines_init` (hash `0000000058299ea3`)
+
+```lean
+theorem WNear.Binary.SerdeObjectPrefix.small_bundled_refines_init (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (raw : WNear.RawStorage) (ctx : NearInterface.Context) (S : WNear.State)
+  (a : WNear.AccountId) (bs rest : List UInt8) (N : ℕ) (hlen : bs.length ≤ 10000)
+  (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw) (hm : ctx.method = "ft_balance_of")
+  (hl : WNear.Binary.FtTotalSupplyMethod.LimitsV86 ctx.protocol) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) =
+      some (some a, rest))
+  (hend : bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) = bs.length)
+  (hcosts : WNear.Binary.FtTotalSupplyMethod.CostsV86 ctx.protocol) (hsize : size ≤ 185625) (hargs : ctx.args = bs)
+  (hrep : (WNear.wnear cfg).Represents raw (some S)) (ha : a ∉ S.registered) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx (some S) (WNear.Call.ftBalanceOf a);
+  (∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a) ≤ ctx.gasLimit →
+        ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx (some S) (WNear.Call.ftBalanceOf a)) →
+          NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧
+            r.usedGas ≤ (WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a)) ∧
+      (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+        NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
 ## Bridge.Methods.Statics297
 
 `WNear.Binary.InitialState.frame297` (hash `637e958867d03070`)
@@ -22767,6 +23075,25 @@ def WNear.PinnedProtocolAvailable : Prop :=
 
 ```lean
 theorem WNear.deployed_code_size : WNear.Binary.wNearBytes.size ≤ 185625
+```
+
+`WNear.ftBalanceOf_absent_parser_complement_obligation` (hash `00000000a5aa42d0`)
+
+```lean
+theorem WNear.ftBalanceOf_absent_parser_complement_obligation (cfg : WNear.Config) (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage)
+  (ctx : NearInterface.Context) (S : WNear.State) (a : WNear.AccountId)
+  (hrep : (WNear.wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw) (hctx : ctx.protocol = protocol)
+  (hm : ctx.method = "ft_balance_of") (hparse : (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a))
+  (ha : a ∉ S.registered)
+  (hother : ¬WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase (some S) ctx (WNear.Call.ftBalanceOf a))
+  (hobject : ¬WNear.Binary.BalanceOf297AbsentCall.ObjectAbsentCase (some S) ctx (WNear.Call.ftBalanceOf a))
+  (hsmall : ¬WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase (some S) ctx (WNear.Call.ftBalanceOf a)) :
+  ∃ parseGas outF,
+    WNear.Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
+      WNear.Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg WNear.Binary.wNearBytes.size raw (some S) ctx S a
+        parseGas outF
 ```
 
 `WNear.ftBalanceOf_absent_parser_cost_obligation` (hash `00000000ddc7e632`)

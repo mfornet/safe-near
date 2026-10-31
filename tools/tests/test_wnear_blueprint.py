@@ -75,7 +75,7 @@ class FrontierPolicyTests(unittest.TestCase):
                      'absent-plan-input-composition', 'balance-absent-parser-plan']:
             self.assertEqual(result[node]['status'], 'Conditional')
             self.assertFalse(result[node]['direct_sorry'])
-        for node in ['argument-limit-v86', 'pinned-arguments-limit', 'balance-absent-parser-cost',
+        for node in ['argument-limit-v86', 'pinned-arguments-limit', 'balance-absent-parser-complement',
                      'key-conditions', 'value-conditions', 'ignore-hyp']:
             self.assertEqual(result[node]['status'], 'Open')
         for source, caller, status in [('string-work-sharp', 'key-series-growth', 'Proven'),
@@ -126,7 +126,7 @@ class FrontierPolicyTests(unittest.TestCase):
                                ('ignore-machine-trace-valid', 'ignore-machine-mixed-budget'),
                                ('ignore-machine-mixed-budget', 'ignore-machine-trace-budget')]:
             self.assertIn({'id': caller, 'status': 'Proven'}, result[source]['integrated_into'])
-        for node in ['ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-cost']:
+        for node in ['ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-complement']:
             self.assertEqual(result[node]['status'], 'Open')
         self.assertEqual(result['global']['status'], 'Conditional')
 
@@ -155,7 +155,7 @@ class FrontierPolicyTests(unittest.TestCase):
                                ('ignored-container-suffix', 'ignored-decoded-suffix'),
                                ('ignored-suffix-code', 'ignored-decoded-suffix')]:
             self.assertIn({'id': caller, 'status': 'Proven'}, result[source]['integrated_into'])
-        for node in ['ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-cost']:
+        for node in ['ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-complement']:
             self.assertEqual(result[node]['status'], 'Open')
         self.assertEqual(result['global']['status'], 'Conditional')
 
@@ -622,10 +622,53 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_small_general_case_is_integrated_without_closing_full_frontier(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['trace-original-cost', 'trace-selected-value-bound', 'trace-selected-member-bound',
+                     'trace-selected-total-bound', 'trace-fuel-account', 'loop-selected-cost-bound',
+                     'selected-parser-cost-bound', 'mixed-small-growth-budget', 'small-general-receipt',
+                     'small-general-accepted', 'small-general-safety']:
+            self.assertEqual(result[node]['status'], 'Proven')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['small-selected-parser-budget', 'small-general-provider-plan', 'small-general-parser-cost',
+                     'balance-absent-parser-cost', 'method-ft_balance_of', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['selected-parser-linear-budget', 'balance-absent-parser-complement',
+                     'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source, caller in [('small-general-parser-cost', 'balance-absent-parser-cost'),
+                               ('balance-absent-parser-complement', 'balance-absent-parser-cost'),
+                               ('small-general-accepted', 'balance-outside-array-object-accepted'),
+                               ('small-general-safety', 'balance-outside-array-object-no-issue')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, result[source]['integrated_into'])
+        self.assertNotIn('WNear.ftBalanceOf_absent_parser_cost_obligation', self.manifest['expected_admissions'])
+        self.assertIn('WNear.ftBalanceOf_absent_parser_complement_obligation', self.manifest['expected_admissions'])
+
+    def test_original_parser_cost_cannot_skip_checked_small_case(self):
+        self.by_id['balance-absent-parser-cost']['proof_dependencies'].remove(self.nodes['small-general-parser-cost']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_original_parser_cost_cannot_hide_remaining_complement(self):
+        self.by_id['balance-absent-parser-cost']['proof_dependencies'].remove(self.nodes['balance-absent-parser-complement']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_full_accepted_assembly_cannot_skip_small_general_case(self):
+        self.by_id['balance-outside-array-object-accepted']['proof_dependencies'].remove(self.nodes['small-general-accepted']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_full_safety_assembly_cannot_skip_small_general_case(self):
+        self.by_id['balance-outside-array-object-no-issue']['proof_dependencies'].remove(self.nodes['small-general-safety']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
-                     'pinned-arguments-limit', 'balance-absent-parser-cost', 'balance-other-state-accepted',
+                     'pinned-arguments-limit', 'balance-absent-parser-complement', 'balance-other-state-accepted',
                      'balance-other-input-state-safety', 'ignore-hyp', 'key-conditions', 'value-conditions']:
             self.assertEqual(result[node]['status'], 'Open')
         for node in ['provider-runs', 'provider-plan-receipt-initial',
@@ -695,7 +738,7 @@ class FrontierPolicyTests(unittest.TestCase):
         for source, caller in [('balance-object-case-accepted', 'balance-outside-array-accepted'),
                                ('balance-object-case-safety', 'balance-outside-array-no-issue')]:
             self.assertIn({'id': caller, 'status': 'Conditional'}, result[source]['integrated_into'])
-        for node in ['pinned-arguments-limit', 'balance-absent-parser-cost', 'balance-other-state-accepted', 'balance-other-input-state-safety',
+        for node in ['pinned-arguments-limit', 'balance-absent-parser-complement', 'balance-other-state-accepted', 'balance-other-input-state-safety',
                      'ignore-hyp', 'key-conditions', 'value-conditions', 'parser-call-contract']:
             self.assertEqual(result[node]['status'], 'Open')
         for node in ['balance-outside-array-accepted', 'balance-outside-array-no-issue',
@@ -756,7 +799,7 @@ class FrontierPolicyTests(unittest.TestCase):
                       result['balance-array-case-safety']['integrated_into'])
         self.assertIn('balance-array-case-refinement',
                       result['balance-copied-case-refinement']['proof_edges'])
-        for node in ['pinned-arguments-limit', 'balance-absent-parser-cost', 'balance-other-state-accepted', 'balance-other-input-state-safety',
+        for node in ['pinned-arguments-limit', 'balance-absent-parser-complement', 'balance-other-state-accepted', 'balance-other-input-state-safety',
                      'ignore-hyp', 'key-conditions', 'value-conditions']:
             self.assertEqual(result[node]['status'], 'Open')
         for node in ['balance-other-accepted', 'balance-other-no-issue', 'balance-accepted',
@@ -819,7 +862,7 @@ class FrontierPolicyTests(unittest.TestCase):
                       result['balance-end-observations']['integrated_into'])
         self.assertNotIn('balance-accepted',
                          [n['id'] for n in result['balance-entry-host']['integrated_into']])
-        for node in ['pinned-arguments-limit', 'balance-absent-parser-cost', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-rejected']:
+        for node in ['pinned-arguments-limit', 'balance-absent-parser-complement', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-rejected']:
             self.assertEqual(result[node]['status'], 'Open')
         self.assertEqual(result['method-ft_balance_of']['status'], 'Conditional')
         self.assertEqual(result['global']['status'], 'Conditional')

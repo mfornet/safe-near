@@ -843,6 +843,24 @@
     "WNear.Binary.BalanceOf297AbsentCall.provider_body_linear_cost",
     "WNear.Binary.BalanceOf297AbsentCall.provider_model_budget_of_parser_linear",
     "WNear.Binary.SerdeObjectPrefix.SelectedParserLinearBudget",
-    "WNear.Binary.SerdeObjectPrefix.linear_bundled_refines_init"
+    "WNear.Binary.SerdeObjectPrefix.linear_bundled_refines_init",
+    "WNear.ftBalanceOf_absent_parser_complement_obligation",
+    "WNear.Binary.SerdeObjectMixedTrace.traceCost",
+    "WNear.Binary.SerdeObjectMixedTrace.keyQ_not_brace",
+    "WNear.Binary.SerdeObjectMixedTrace.CallTrace.objCost_eq",
+    "WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_charge",
+    "WNear.Binary.SerdeObjectMixedTrace.member_selected_charge",
+    "WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_cost_le",
+    "WNear.Binary.SerdeObjectMixedTrace.loop_keys_fuel_account",
+    "WNear.Binary.SerdeObjectMixedTrace.loop_selected_cost_le",
+    "WNear.Binary.SerdeObjectMixedTrace.selected_parser_cost_le",
+    "WNear.Binary.SerdeObjectMixedTrace.mixed_growth_small_budget",
+    "WNear.Binary.SerdeObjectMixedTrace.selected_parser_linear_small",
+    "WNear.Binary.SerdeObjectPrefix.small_bundled_plan",
+    "WNear.Binary.SerdeObjectPrefix.small_bundled_refines_init",
+    "WNear.Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase",
+    "WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_accepted",
+    "WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_no_issue",
+    "WNear.Binary.BalanceOf297AbsentCall.small_general_parser_cost"
   ]
 }

@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfSmallGeneralObject
 import Bridge.Methods.AcceptedInputBounds
 import Bridge.Methods.FtBalanceOfProviderRefines
 import Spec.Contract
@@ -162,8 +163,25 @@ theorem pinned_arguments_obligation (protocol : Wasm.Near.RuntimeConfig)
     Binary.InputDomain.ArgumentLimitV86 protocol := by
   sorry
 
-/-- Remaining accepted initialized/absent inputs need a parser/resource/gas witness, not another receipt proof.
-The same parseGas/outF witness must satisfy both actual code execution and the unchanged model budget. -/
+/-- Precise remaining parser/resource/gas obligation outside completed array, escape-free object,
+and <=10000-byte general-object cases. No full-domain gas or parser result is assumed proved. -/
+theorem ftBalanceOf_absent_parser_complement_obligation (cfg : Config)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (ctx : Context) (S : State) (a : AccountId)
+    (hrep : (wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (hparse : (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) (ha : a ∉ S.registered)
+    (hother : ¬ Binary.BalanceOf297AbsentCall.ArrayAbsentCase (some S) ctx (.ftBalanceOf a))
+    (hobject : ¬ Binary.BalanceOf297AbsentCall.ObjectAbsentCase (some S) ctx (.ftBalanceOf a))
+    (hsmall : ¬ Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase (some S) ctx (.ftBalanceOf a)) :
+    ∃ parseGas outF, Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
+      Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg wNearBytes.size raw (some S) ctx S a parseGas outF := by
+  sorry
+
+/-- Checked split: the actual small general-object parser and original budget are constructed;
+only the explicitly complementary accepted initialized/absent inputs remain admitted. -/
 theorem ftBalanceOf_absent_parser_cost_obligation (cfg : Config)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -176,7 +194,12 @@ theorem ftBalanceOf_absent_parser_cost_obligation (cfg : Config)
     (hobject : ¬ Binary.BalanceOf297AbsentCall.ObjectAbsentCase (some S) ctx (.ftBalanceOf a)) :
     ∃ parseGas outF, Binary.BalanceOf297AbsentCall.DeployedParserProvider ctx.protocol ctx.args a parseGas outF ∧
       Binary.BalanceOf297AbsentCall.ProviderModelBudget cfg wNearBytes.size raw (some S) ctx S a parseGas outF := by
-  sorry
+  classical
+  by_cases hsmall : Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase (some S) ctx (.ftBalanceOf a)
+  · exact Binary.BalanceOf297AbsentCall.small_general_parser_cost cfg wNearBytes.size raw ctx S a
+      (hctx ▸ he.costs) deployed_code_size hrep hwf hsmall
+  · exact ftBalanceOf_absent_parser_complement_obligation cfg protocol hprotocol he hcfg raw ctx S a
+      hrep hwf hctx hm hparse ha hother hobject hsmall
 
 /-- Checked construction: accepted-input nonemptiness is proved, and the protocol ceiling and parser cost remain explicit. -/
 theorem ftBalanceOf_absent_parser_plan_obligation (cfg : Config)
@@ -224,13 +247,18 @@ theorem ftBalanceOf_outside_array_object_absent_no_issue_obligation (cfg : Confi
     ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
       .error (.executionIssue msg) := by
   classical
-  by_cases hcase : ∃ (S : State) (a : AccountId), st = some S ∧ (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a) ∧ a ∉ S.registered
-  · obtain ⟨S, a, rfl, hparse, ha⟩ := hcase
-    have hPlan := ftBalanceOf_absent_parser_plan_obligation cfg protocol hprotocol he hcfg raw ctx S a
-      hrep hwf hctx hm hparse ha (fun hx => hother ⟨_, hx⟩) (fun hx => hobject ⟨_, hx⟩)
-    exact (Binary.BalanceOf297AbsentCall.provider_plan_refines_init cfg wNearBytes.size codeOf raw ctx S a ctx.args
-      (hctx ▸ he.runtime) hwf hm (hctx ▸ he.limits) hPlan rfl hrep ha).1
-  · exact ftBalanceOf_other_input_state_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm hother hobject hcase
+  by_cases hsmall : ∃ c, Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase st ctx c
+  · obtain ⟨c, hc⟩ := hsmall
+    exact Binary.BalanceOf297AbsentCall.small_general_object_case_no_issue cfg wNearBytes.size codeOf protocol he
+      deployed_code_size raw st ctx c hrep hwf hctx hm hc
+  ·
+    by_cases hcase : ∃ (S : State) (a : AccountId), st = some S ∧ (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a) ∧ a ∉ S.registered
+    · obtain ⟨S, a, rfl, hparse, ha⟩ := hcase
+      have hPlan := ftBalanceOf_absent_parser_plan_obligation cfg protocol hprotocol he hcfg raw ctx S a
+        hrep hwf hctx hm hparse ha (fun hx => hother ⟨_, hx⟩) (fun hx => hobject ⟨_, hx⟩)
+      exact (Binary.BalanceOf297AbsentCall.provider_plan_refines_init cfg wNearBytes.size codeOf raw ctx S a ctx.args
+        (hctx ▸ he.runtime) hwf hm (hctx ▸ he.limits) hPlan rfl hrep ha).1
+    · exact ftBalanceOf_other_input_state_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm hother hobject hcase
 
 /-- Checked split on the completed escape-free object case; the precise complement remains Open. -/
 theorem ftBalanceOf_outside_array_absent_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
@@ -324,13 +352,17 @@ theorem ftBalanceOf_outside_array_object_absent_accepted_obligation (cfg : Confi
     (Matches (wnear cfg) ctx raw r res ∨
       (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
   classical
-  by_cases hcase : ∃ (S : State) (a : AccountId), st = some S ∧ c = .ftBalanceOf a ∧ a ∉ S.registered
-  · obtain ⟨S, a, rfl, rfl, ha⟩ := hcase
-    have hPlan := ftBalanceOf_absent_parser_plan_obligation cfg protocol hprotocol he hcfg raw ctx S a
-      hrep hwf hctx hm hparse ha hother hobject
-    exact (Binary.BalanceOf297AbsentCall.provider_plan_refines_init cfg wNearBytes.size codeOf raw ctx S a ctx.args
-      (hctx ▸ he.runtime) hwf hm (hctx ▸ he.limits) hPlan rfl hrep ha).2
-  · exact ftBalanceOf_other_state_accepted_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm c hparse hother hobject hcase
+  by_cases hsmall : Binary.BalanceOf297AbsentCall.SmallGeneralObjectAbsentCase st ctx c
+  · exact Binary.BalanceOf297AbsentCall.small_general_object_case_accepted cfg wNearBytes.size codeOf protocol he
+      deployed_code_size raw st ctx c hrep hwf hctx hm hsmall
+  ·
+    by_cases hcase : ∃ (S : State) (a : AccountId), st = some S ∧ c = .ftBalanceOf a ∧ a ∉ S.registered
+    · obtain ⟨S, a, rfl, rfl, ha⟩ := hcase
+      have hPlan := ftBalanceOf_absent_parser_plan_obligation cfg protocol hprotocol he hcfg raw ctx S a
+        hrep hwf hctx hm hparse ha hother hobject
+      exact (Binary.BalanceOf297AbsentCall.provider_plan_refines_init cfg wNearBytes.size codeOf raw ctx S a ctx.args
+        (hctx ▸ he.runtime) hwf hm (hctx ▸ he.limits) hPlan rfl hrep ha).2
+    · exact ftBalanceOf_other_state_accepted_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm c hparse hother hobject hcase
 
 /-- Checked split on the completed escape-free object case; the precise complement remains Open. -/
 theorem ftBalanceOf_outside_array_absent_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)

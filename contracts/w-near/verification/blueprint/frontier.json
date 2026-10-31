@@ -3282,11 +3282,12 @@
       "title": "ft_balance_of: safety outside completed array/object cases",
       "kind": "theorem",
       "label": "frontier:balance-outside-array-object-no-issue",
-      "notes": "Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional.",
+      "notes": "Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional.",
       "required_proof_dependencies": [
         "balance-absent-parser-plan",
         "provider-plan-receipt-initial",
-        "balance-other-input-state-safety"
+        "balance-other-input-state-safety",
+        "small-general-safety"
       ],
       "reviewed_shape_hash": 690425189
     },
@@ -3296,11 +3297,12 @@
       "title": "ft_balance_of: accepted outside completed array/object cases",
       "kind": "theorem",
       "label": "frontier:balance-outside-array-object-accepted",
-      "notes": "Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional.",
+      "notes": "Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional.",
       "required_proof_dependencies": [
         "balance-absent-parser-plan",
         "provider-plan-receipt-initial",
-        "balance-other-state-accepted"
+        "balance-other-state-accepted",
+        "small-general-accepted"
       ],
       "reviewed_shape_hash": 3187448350
     },
@@ -3903,11 +3905,14 @@
     {
       "id": "balance-absent-parser-cost",
       "declaration": "WNear.ftBalanceOf_absent_parser_cost_obligation",
-      "title": "Accepted absent-account inputs: parser and cost witness",
-      "kind": "admission",
+      "title": "Accepted absent-parser cost: checked small case and explicit complement",
+      "kind": "theorem",
       "label": "frontier:balance-absent-parser-cost",
-      "notes": "Remaining outside-case obligation is exactly one parser-cost/free-list witness satisfying actual-code execution and the unchanged whole-method budget. Input positivity is proved separately, and input size follows the explicit pinned argument-ceiling obligation.",
-      "required_proof_dependencies": [],
+      "notes": "The exact original statement is preserved. Checked case split constructs actual parser provider and original funding for the completed <=10000-byte full general-object case; only the explicitly excluded complement remains admitted. This composition is Conditional and retains every protocol/domain premise.",
+      "required_proof_dependencies": [
+        "small-general-parser-cost",
+        "balance-absent-parser-complement"
+      ],
       "reviewed_shape_hash": 3720865330,
       "required_type_dependencies": [
         "deployed-parser-provider",
@@ -7968,6 +7973,221 @@
         "fully-bundled-receipt"
       ],
       "reviewed_shape_hash": 2202897778
+    },
+    {
+      "id": "trace-original-cost",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.CallTrace.objCost_eq",
+      "title": "Original object cost equals its complete actual trace",
+      "kind": "theorem",
+      "label": "frontier:trace-original-cost",
+      "notes": "The same costObj recurrence equals traceCost over actual successful key/value endpoints when trace length fits model fuel.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "trace-value-end"
+      ],
+      "reviewed_shape_hash": 210567573
+    },
+    {
+      "id": "trace-selected-value-bound",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_charge",
+      "title": "Both selected value branches fit one common growth sum",
+      "kind": "theorem",
+      "label": "frontier:trace-selected-value-bound",
+      "notes": "Account and ignored witnesses agree with exact selected allowances. Account reserve is conditional on the actual account branch; all growth follows retained history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "selected-account-value-bound",
+        "selected-ignore-cost"
+      ],
+      "reviewed_shape_hash": 3247811257
+    },
+    {
+      "id": "trace-selected-member-bound",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.member_selected_charge",
+      "title": "Actual selected member charge fits disjoint bytes",
+      "kind": "theorem",
+      "label": "frontier:trace-selected-member-bound",
+      "notes": "Combines the 470-operation bundled key bound, exact selected value allowance, actual whitespace and complete member input partition. Growth is retained and the account reserve is conditional on its branch.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "trace-selected-value-bound",
+        "ignored-member-work-470",
+        "member-input-partition",
+        "bundled-selected-key-cost"
+      ],
+      "reviewed_shape_hash": 3486928150
+    },
+    {
+      "id": "trace-selected-total-bound",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_cost_le",
+      "title": "Full selected trace sums bytes, one account and retained growth",
+      "kind": "theorem",
+      "label": "frontier:trace-selected-total-bound",
+      "notes": "The complete exact selected trace is bounded by disjoint consumed bytes, 500 billion gas per actual account (at most one) and one evolving mixed scratch history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "trace-selected-member-bound",
+        "trace-input-partition"
+      ],
+      "reviewed_shape_hash": 3505891196
+    },
+    {
+      "id": "trace-fuel-account",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.loop_keys_fuel_account",
+      "title": "Actual object model supplies fuel and account slots together",
+      "kind": "theorem",
+      "label": "frontier:trace-fuel-account",
+      "notes": "The same ordered actual key path simultaneously fits model fuel and has at most one account including saved state.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3693872684
+    },
+    {
+      "id": "loop-selected-cost-bound",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.loop_selected_cost_le",
+      "title": "Actual original object recurrence receives the trace bound",
+      "kind": "theorem",
+      "label": "frontier:loop-selected-cost-bound",
+      "notes": "Model fuel/account slots instantiate exact costObj equality and the complete selected-trace sum, without resetting scratch.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "trace-original-cost",
+        "trace-selected-total-bound",
+        "trace-fuel-account"
+      ],
+      "reviewed_shape_hash": 2260970800
+    },
+    {
+      "id": "selected-parser-cost-bound",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.selected_parser_cost_le",
+      "title": "Actual parser cost retains one mixed growth term",
+      "kind": "theorem",
+      "label": "frontier:selected-parser-cost-bound",
+      "notes": "Original ledgerParserCost fits (2215+470*inputbytes) operations plus one 500-billion account reserve and actual extraCost of a complete model history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "loop-selected-cost-bound",
+        "trace-input-partition"
+      ],
+      "reviewed_shape_hash": 1869315078
+    },
+    {
+      "id": "mixed-small-growth-budget",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.mixed_growth_small_budget",
+      "title": "Mixed growth is funded for actual histories up to 10000 bytes",
+      "kind": "theorem",
+      "label": "frontier:mixed-small-growth-budget",
+      "notes": "Under reviewed Wasm ceilings, peak<=10000 and global growth<=21 bound the same actual mixed extraCost by 500 billion gas. No full-4-MiB growth claim is made.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-batches-model-bounds",
+        "mixed-growth-v86"
+      ],
+      "reviewed_shape_hash": 4253861210
+    },
+    {
+      "id": "small-selected-parser-budget",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.selected_parser_linear_small",
+      "title": "Exact selected parser inequality is instantiated up to 10000 bytes",
+      "kind": "theorem",
+      "label": "frontier:small-selected-parser-budget",
+      "notes": "All successful general-object inputs up to 10000 bytes fund the same exact SelectedParserLinearBudget. This scoped constructor does not discharge the generic full-domain interface.",
+      "required_type_dependencies": [
+        "selected-parser-linear-budget"
+      ],
+      "required_proof_dependencies": [
+        "selected-parser-cost-bound",
+        "mixed-small-growth-budget"
+      ],
+      "reviewed_shape_hash": 3269157416
+    },
+    {
+      "id": "small-general-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.small_bundled_plan",
+      "title": "Small general objects construct actual provider and original budget",
+      "kind": "theorem",
+      "label": "frontier:small-general-provider-plan",
+      "notes": "Instantiates all selected reader allowances and proves original whole-model funding, producing the existing actual-code parser plan under explicit storage/protocol/size premises.",
+      "required_type_dependencies": [
+        "absent-parser-plan"
+      ],
+      "required_proof_dependencies": [
+        "small-selected-parser-budget",
+        "provider-budget-from-linear",
+        "bundled-provider-plan"
+      ],
+      "reviewed_shape_hash": 3363993226
+    },
+    {
+      "id": "small-general-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.small_bundled_refines_init",
+      "title": "General objects up to 10000 bytes have full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:small-general-receipt",
+      "notes": "Instantiates the exact parser inequality and full initialized absent-account receipt. Escapes and complete nested ignored values are supported. Same safety/used gas/Matches/resource-failure/rollback/log-prefix claims under unchanged protocol/domain premises; no abstract gas premise remains.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "small-selected-parser-budget",
+        "linear-bundled-receipt"
+      ],
+      "reviewed_shape_hash": 1479122595
+    },
+    {
+      "id": "small-general-accepted",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_accepted",
+      "title": "Small general-object case supplies accepted-call clauses",
+      "kind": "theorem",
+      "label": "frontier:small-general-accepted",
+      "notes": "Exact scoped input/state case instantiates full receipt refinement with the reviewed exported environment. Larger inputs and other states remain unresolved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "small-general-receipt"
+      ],
+      "reviewed_shape_hash": 2220050542
+    },
+    {
+      "id": "small-general-safety",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_no_issue",
+      "title": "Small general-object case supplies execution safety",
+      "kind": "theorem",
+      "label": "frontier:small-general-safety",
+      "notes": "The same checked scoped case provides no execution issue under reviewed environment and representation.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "small-general-receipt"
+      ],
+      "reviewed_shape_hash": 1393291277
+    },
+    {
+      "id": "small-general-parser-cost",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.small_general_parser_cost",
+      "title": "Small case fills the original actual-provider/cost interface",
+      "kind": "theorem",
+      "label": "frontier:small-general-parser-cost",
+      "notes": "Representation and scoped input/state models construct actual parser provider and original model budget in the exact conclusion shape used by the remaining absent-parser frontier.",
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "small-general-provider-plan"
+      ],
+      "reviewed_shape_hash": 2449388058
+    },
+    {
+      "id": "balance-absent-parser-complement",
+      "declaration": "WNear.ftBalanceOf_absent_parser_complement_obligation",
+      "title": "Exact remaining absent-parser inputs outside the checked small object case",
+      "kind": "admission",
+      "label": "frontier:balance-absent-parser-complement",
+      "notes": "Same actual-code provider and unchanged whole-model budget must be supplied for accepted initialized/unregistered inputs outside all three completed array, escape-free object and <=10000-byte full general-object cases. The explicit negated SmallGeneralObjectAbsentCase premise is part of this audited statement. This obligation is Open; no full-domain funding is claimed.",
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2779398864,
+      "indirect_admission": true
     }
   ],
   "reviewed_environment": [
@@ -7996,7 +8216,7 @@
     "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
     "WNear.ftBalanceOf_other_state_accepted_obligation",
     "WNear.pinned_arguments_obligation",
-    "WNear.ftBalanceOf_absent_parser_cost_obligation"
+    "WNear.ftBalanceOf_absent_parser_complement_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -8029,6 +8249,7 @@
     "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
     "WNear.ftBalanceOf_other_state_accepted_obligation",
     "WNear.pinned_arguments_obligation",
-    "WNear.ftBalanceOf_absent_parser_cost_obligation"
+    "WNear.ftBalanceOf_absent_parser_cost_obligation",
+    "WNear.ftBalanceOf_absent_parser_complement_obligation"
   ]
 }

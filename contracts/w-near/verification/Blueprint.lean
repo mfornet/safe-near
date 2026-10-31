@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfSmallGeneralObject
 import Bridge.Methods.FtBalanceOfProviderLinearGas
 import Bridge.Functions.SerdeMixedPrefix
 import Bridge.Functions.SerdeBundledRate
@@ -1486,13 +1487,13 @@ attribute [blueprint "frontier:balance-object-case-safety"
 
 attribute [blueprint "frontier:balance-outside-array-object-no-issue"
   (title := /-- ft_balance_of: safety outside completed array/object cases -/)
-  (statement := /-- Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional. -/)
+  (statement := /-- Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation
 
 attribute [blueprint "frontier:balance-outside-array-object-accepted"
   (title := /-- ft_balance_of: accepted outside completed array/object cases -/)
-  (statement := /-- Preserves the exact original statement. Checked split through full actual-code parser-plan receipt composition for accepted initialized/unregistered calls; the parser/resource/gas witness and exact complementary state/input obligation remain Open, so this assembly remains Conditional. -/)
+  (statement := /-- Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation
 
@@ -1747,8 +1748,8 @@ attribute [blueprint "frontier:pinned-arguments-limit"
   WNear.pinned_arguments_obligation
 
 attribute [blueprint "frontier:balance-absent-parser-cost"
-  (title := /-- Accepted absent-account inputs: parser and cost witness -/)
-  (statement := /-- Remaining outside-case obligation is exactly one parser-cost/free-list witness satisfying actual-code execution and the unchanged whole-method budget. Input positivity is proved separately, and input size follows the explicit pinned argument-ceiling obligation. -/)
+  (title := /-- Accepted absent-parser cost: checked small case and explicit complement -/)
+  (statement := /-- The exact original statement is preserved. Checked case split constructs actual parser provider and original funding for the completed <=10000-byte full general-object case; only the explicitly excluded complement remains admitted. This composition is Conditional and retains every protocol/domain premise. -/)
   (notReady := true)]
   WNear.ftBalanceOf_absent_parser_cost_obligation
 
@@ -3304,3 +3305,82 @@ attribute [blueprint "frontier:linear-bundled-receipt"
   (statement := /-- Actual representation and absent-account storage instantiate host premises. Checked linear funding constructs ProviderModelBudget and feeds the full selected-reader receipt. Exact parser inequality and unchanged protocol/domain premises remain unresolved. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectPrefix.linear_bundled_refines_init
+
+attribute [blueprint "frontier:trace-original-cost"
+  (title := /-- Original object cost equals its complete actual trace -/)
+  (statement := /-- The same costObj recurrence equals traceCost over actual successful key/value endpoints when trace length fits model fuel. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace.objCost_eq
+
+attribute [blueprint "frontier:trace-selected-value-bound"
+  (title := /-- Both selected value branches fit one common growth sum -/)
+  (statement := /-- Account and ignored witnesses agree with exact selected allowances. Account reserve is conditional on the actual account branch; all growth follows retained history. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_charge
+
+attribute [blueprint "frontier:trace-selected-member-bound"
+  (title := /-- Actual selected member charge fits disjoint bytes -/)
+  (statement := /-- Combines the 470-operation bundled key bound, exact selected value allowance, actual whitespace and complete member input partition. Growth is retained and the account reserve is conditional on its branch. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.member_selected_charge
+
+attribute [blueprint "frontier:trace-selected-total-bound"
+  (title := /-- Full selected trace sums bytes, one account and retained growth -/)
+  (statement := /-- The complete exact selected trace is bounded by disjoint consumed bytes, 500 billion gas per actual account (at most one) and one evolving mixed scratch history. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_cost_le
+
+attribute [blueprint "frontier:trace-fuel-account"
+  (title := /-- Actual object model supplies fuel and account slots together -/)
+  (statement := /-- The same ordered actual key path simultaneously fits model fuel and has at most one account including saved state. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.loop_keys_fuel_account
+
+attribute [blueprint "frontier:loop-selected-cost-bound"
+  (title := /-- Actual original object recurrence receives the trace bound -/)
+  (statement := /-- Model fuel/account slots instantiate exact costObj equality and the complete selected-trace sum, without resetting scratch. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.loop_selected_cost_le
+
+attribute [blueprint "frontier:selected-parser-cost-bound"
+  (title := /-- Actual parser cost retains one mixed growth term -/)
+  (statement := /-- Original ledgerParserCost fits (2215+470*inputbytes) operations plus one 500-billion account reserve and actual extraCost of a complete model history. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.selected_parser_cost_le
+
+attribute [blueprint "frontier:mixed-small-growth-budget"
+  (title := /-- Mixed growth is funded for actual histories up to 10000 bytes -/)
+  (statement := /-- Under reviewed Wasm ceilings, peak<=10000 and global growth<=21 bound the same actual mixed extraCost by 500 billion gas. No full-4-MiB growth claim is made. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.mixed_growth_small_budget
+
+attribute [blueprint "frontier:small-selected-parser-budget"
+  (title := /-- Exact selected parser inequality is instantiated up to 10000 bytes -/)
+  (statement := /-- All successful general-object inputs up to 10000 bytes fund the same exact SelectedParserLinearBudget. This scoped constructor does not discharge the generic full-domain interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.selected_parser_linear_small
+
+attribute [blueprint "frontier:small-general-provider-plan"
+  (title := /-- Small general objects construct actual provider and original budget -/)
+  (statement := /-- Instantiates all selected reader allowances and proves original whole-model funding, producing the existing actual-code parser plan under explicit storage/protocol/size premises. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.small_bundled_plan
+
+attribute [blueprint "frontier:small-general-receipt"
+  (title := /-- General objects up to 10000 bytes have full receipt refinement -/)
+  (statement := /-- Instantiates the exact parser inequality and full initialized absent-account receipt. Escapes and complete nested ignored values are supported. Same safety/used gas/Matches/resource-failure/rollback/log-prefix claims under unchanged protocol/domain premises; no abstract gas premise remains. -/)]
+  WNear.Binary.SerdeObjectPrefix.small_bundled_refines_init
+
+attribute [blueprint "frontier:small-general-accepted"
+  (title := /-- Small general-object case supplies accepted-call clauses -/)
+  (statement := /-- Exact scoped input/state case instantiates full receipt refinement with the reviewed exported environment. Larger inputs and other states remain unresolved. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_accepted
+
+attribute [blueprint "frontier:small-general-safety"
+  (title := /-- Small general-object case supplies execution safety -/)
+  (statement := /-- The same checked scoped case provides no execution issue under reviewed environment and representation. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.small_general_object_case_no_issue
+
+attribute [blueprint "frontier:small-general-parser-cost"
+  (title := /-- Small case fills the original actual-provider/cost interface -/)
+  (statement := /-- Representation and scoped input/state models construct actual parser provider and original model budget in the exact conclusion shape used by the remaining absent-parser frontier. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.small_general_parser_cost
+
+attribute [blueprint "frontier:balance-absent-parser-complement"
+  (title := /-- Exact remaining absent-parser inputs outside the checked small object case -/)
+  (statement := /-- Same actual-code provider and unchanged whole-model budget must be supplied for accepted initialized/unregistered inputs outside all three completed array, escape-free object and <=10000-byte full general-object cases. The explicit negated SmallGeneralObjectAbsentCase premise is part of this audited statement. This obligation is Open; no full-domain funding is claimed. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_absent_parser_complement_obligation

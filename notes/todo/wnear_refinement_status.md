@@ -33,6 +33,61 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: exact selected trace reaches global callers
+
+The original costObj recurrence now equals traceCost over the complete actual
+successful key/value path, with model fuel tracked alongside account slots.
+The exact selected charges sum over disjoint input, one account reserve and one
+retained mixed growth history. Capacity and allocator state evolve across all
+members; neither scratch nor the account reserve is restarted per field.
+The same ledgerParserCost is bounded by (2215+470*inputbytes) regular operations,
+500 billion gas for the at-most-one account, and actual mixed extraCost.
+
+For successful general objects up to 10000 bytes, actual model histories have
+peak<=10000 and at most 21 global growths. Existing mixed growth bounds fund
+extraCost by 500 billion gas under reviewed Wasm cost ceilings. This instantiates
+SelectedParserLinearBudget, then the original ProviderModelBudget, the actual
+parser plan and full initialized absent-account receipt. Escaped keys/values and
+complete nested ignored values are supported in this scoped case. Its receipt,
+accepted-call clauses and execution safety are Proven under reviewed protocol,
+domain and representation premises, with no abstract reader/gas obligation.
+The generic full-domain parser/gas contracts remain Open.
+
+Both existing full-domain accepted and safety callers now split directly on
+SmallGeneralObjectAbsentCase and invoke those completed clauses. Their original
+statements remain byte-identical. The original absent-parser-cost theorem is
+also a checked split: it constructs the actual provider and original budget for
+the completed case, then invokes a precise named complement obligation.
+ftBalanceOf_absent_parser_complement_obligation retains all old premises plus
+explicit exclusion of the <=10000-byte full general-object case, alongside the
+existing array and escape-free object exclusions. This complement includes
+larger inputs and accepted forms whose actual parser model is not yet connected;
+it is not described as merely a size condition. It remains an Open admission.
+The old parser-cost result, method and global callers remain Conditional.
+
+The direct admission frontier replaces the old broad parser-cost admission by
+this explicit complement. The exact transitive incomplete frontier adds the
+new complement and retains its dependent original parser-cost theorem. No
+allowlisted module, axiom policy, old statement, observation, resource budget or
+full 4 MiB goal is weakened. Generic IgnoreHyp, KeyConditions, ValueConditions,
+remaining methods/states/inputs and protocol instantiation obligations stay Open.
+
+Next: sharpen actual full ignored-reader work or retain enough structural slack
+to fund mixed growth for the entire 4 MiB domain, and connect accepted JSON to
+the actual successful parser models. The 10000-byte result is an integrated
+case, not a replacement goal. Current conservative 470-per-ignored-byte plus
+separate frame growth may need a tighter actual-code allowance; it is not a
+binary counterexample. Full completion still requires no sorryAx.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T14:21:19+00:00 for proof source `2a0e0daaab317052412729c51d397047e677ea46cbfd39f906c66c19d1a7240f`. All 108 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical, including the three full-domain assembled statements.
+The exact direct/transitive admission frontier reflects only the reviewed
+parser-cost complement replacement above; the Proofs.Refinement module allowance
+and original gas/observation/domain statements are unchanged. Publication requires
+matching served evidence.
+
 ## Continuation on 2026-10-31: original model funding composed from an exact parser frontier
 
 The actual state-read/absent-lookup/return suffix now has additive kernel-checked
